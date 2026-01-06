@@ -291,6 +291,44 @@ services:
   # IPAM SERVICES
   # ============================================
 
+  ipam-service:
+    build:
+      context: ./apps/ipam
+      dockerfile: Dockerfile
+      target: development
+    profiles: ["ipam"]
+    container_name: netnynja-ipam-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      IPAM_HOST: "0.0.0.0"
+      IPAM_PORT: "3003"
+      POSTGRES_URL: postgresql://${POSTGRES_USER:-netnynja}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-netnynja}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      NATS_URL: nats://nats:4222
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_TOKEN:-netnynja-dev-token}
+      JWT_SECRET: ${JWT_SECRET:-netnynja-dev-jwt-secret-2025}
+      VICTORIA_METRICS_URL: http://victoriametrics:8428
+      LOG_LEVEL: DEBUG
+    volumes:
+      - ./apps/ipam/src:/app/src:ro
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:3003/healthz').raise_for_status()"]
+    logging: *default-logging
+    networks:
+      - netnynja-network
+
   ipam-scanner:
     build:
       context: ./apps/ipam
@@ -304,6 +342,11 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       NATS_URL: nats://nats:4222
       VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_TOKEN:-netnynja-dev-token}
+      JWT_SECRET: ${JWT_SECRET:-netnynja-dev-jwt-secret-2025}
+      VICTORIA_METRICS_URL: http://victoriametrics:8428
+      SCAN_CONCURRENCY: "50"
+      PING_TIMEOUT: "1.0"
     volumes:
       - ./apps/ipam/src:/app/src:ro
     depends_on:
@@ -311,12 +354,12 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-    # Scanner needs network access for discovery
-    network_mode: host
-    extra_hosts:
-      - "postgres:127.0.0.1"
-      - "redis:127.0.0.1"
-      - "nats:127.0.0.1"
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    logging: *default-logging
+    networks:
+      - netnynja-network
 
   # ============================================
   # NPM SERVICES
