@@ -2,6 +2,10 @@
 
 > Active issues and technical debt tracking
 
+**Version**: 0.1.0
+**Last Updated**: 2026-01-06 15:09 EST
+**Open Issues**: 15 | **Resolved Issues**: 3
+
 ## Issue Categories
 
 - 🔴 **Critical** - Blocking issues that prevent core functionality
@@ -20,6 +24,17 @@
 | #001 | 🟡 | Validate npm workspaces on all platforms | - | Open |
 | #002 | 🟡 | Test Poetry install on Windows | - | Open |
 | #003 | 🟢 | Add pre-commit hooks | - | Open |
+
+### E2E Testing
+
+| ID | Priority | Title | Assignee | Status |
+|----|----------|-------|----------|--------|
+| #040 | 🟡 | Frontend tests fail - web-ui not running on port 5173 | - | Resolved |
+| #041 | 🟠 | Logout endpoint returns 400 due to empty JSON body validation | - | Resolved |
+| #042 | 🟠 | Operator role cannot delete networks (403 Forbidden) | - | Resolved |
+| #043 | 🟡 | OpenAPI documentation not exposed at /docs | - | Open |
+| #044 | 🟡 | Grafana dashboards not provisioned | - | Open |
+| #045 | 🟡 | VictoriaMetrics missing netnynja_* metrics | - | Open |
 
 ### Infrastructure
 
@@ -52,7 +67,9 @@
 
 | ID | Priority | Title | Resolved Date | Resolution |
 |----|----------|-------|---------------|------------|
-| - | - | - | - | - |
+| #040 | 🟡 | Frontend tests fail - web-ui not running on port 5173 | 2026-01-06 | Fixed `BASE_URL` in test_frontend.py to port 3000 (per vite.config.ts) and corrected test password |
+| #041 | 🟠 | Logout endpoint returns 400 due to empty JSON body | 2026-01-06 | Modified auth.ts logout route to not send Content-Type header when no body, and handle empty responses |
+| #042 | 🟠 | Operator role cannot delete networks | 2026-01-06 | Updated IPAM delete route RBAC from `admin` only to `admin, operator` in ipam/index.ts:288 |
 
 ---
 

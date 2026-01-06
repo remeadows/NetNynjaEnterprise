@@ -285,7 +285,7 @@ const ipamRoutes: FastifyPluginAsync = async (fastify) => {
         required: ['id'],
       },
     },
-    preHandler: [fastify.requireRole('admin')],
+    preHandler: [fastify.requireRole('admin', 'operator')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
 

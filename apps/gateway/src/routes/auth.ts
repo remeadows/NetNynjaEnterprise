@@ -118,6 +118,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     schema: {
       tags: ['Authentication'],
       summary: 'Logout and invalidate tokens',
+      security: [{ bearerAuth: [] }],
     },
   }, async (request, reply) => {
     const authHeader = request.headers.authorization;
@@ -125,14 +126,23 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     const response = await fetch(`${authServiceUrl}/logout`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         ...(authHeader && { Authorization: authHeader }),
         'X-Request-Id': request.id,
       },
     });
 
-    const data = await response.json();
-    reply.status(response.status).send(data);
+    // Handle case where auth service returns empty response
+    const text = await response.text();
+    if (!text) {
+      return reply.status(response.status).send({ success: true, message: 'Logged out' });
+    }
+
+    try {
+      const data = JSON.parse(text);
+      reply.status(response.status).send(data);
+    } catch {
+      reply.status(response.status).send({ success: true, message: 'Logged out' });
+    }
   });
 
   // Get current user

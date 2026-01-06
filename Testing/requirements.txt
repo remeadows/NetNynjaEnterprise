@@ -1,0 +1,29 @@
+# NetNynja Enterprise E2E Test Suite
+# Python dependencies
+
+# Testing framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-html>=4.1.0
+pytest-timeout>=2.2.0
+pytest-xdist>=3.5.0  # Parallel test execution
+
+# HTTP client
+httpx>=0.25.0
+
+# Database clients
+psycopg[binary]>=3.1.0
+redis>=5.0.0
+
+# NATS client
+nats-py>=2.6.0
+
+# JWT handling
+PyJWT>=2.8.0
+
+# Playwright for frontend tests
+playwright>=1.40.0
+
+# Utilities
+python-dateutil>=2.8.0
+pydantic>=2.5.0
