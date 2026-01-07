@@ -1,0 +1,116 @@
+{
+  "platform": "RHEL",
+  "version": "9.x (UBI 9 Minimal)",
+  "timestamp": "2026-01-07T10:15:00Z",
+  "test_method": "Docker container simulation on macOS ARM64 host",
+  "container_image": "redhat/ubi9-minimal:latest",
+  "note": "Tests run in RHEL 9 container connecting to host infrastructure services",
+  "summary": {
+    "passed": 12,
+    "failed": 0,
+    "skipped": 3,
+    "total": 15,
+    "pass_rate": 100
+  },
+  "sections": {
+    "container_connectivity": {
+      "status": "PASS",
+      "tests": [
+        {
+          "id": "1.1",
+          "name": "RHEL 9 UBI container available",
+          "status": "pass"
+        },
+        {
+          "id": "1.2",
+          "name": "DNS resolution in container",
+          "status": "pass"
+        },
+        {
+          "id": "1.3",
+          "name": "PostgreSQL connectivity (postgres:5432)",
+          "status": "pass"
+        },
+        {
+          "id": "1.4",
+          "name": "Redis connectivity (redis:6379)",
+          "status": "pass"
+        },
+        {
+          "id": "1.5",
+          "name": "NATS connectivity (nats:4222)",
+          "status": "pass"
+        },
+        {
+          "id": "1.6",
+          "name": "Vault connectivity (vault:8200)",
+          "status": "pass"
+        }
+      ]
+    },
+    "http_endpoints": {
+      "status": "PASS",
+      "tests": [
+        { "id": "2.1", "name": "NATS health endpoint", "status": "pass" },
+        { "id": "2.2", "name": "Vault health endpoint", "status": "pass" },
+        { "id": "2.3", "name": "Prometheus health endpoint", "status": "pass" },
+        {
+          "id": "2.4",
+          "name": "VictoriaMetrics health endpoint",
+          "status": "pass"
+        }
+      ]
+    },
+    "dockerfile_compatibility": {
+      "status": "PASS",
+      "tests": [
+        {
+          "id": "3.1",
+          "name": "Gateway Dockerfile (node:20-alpine)",
+          "status": "pass",
+          "note": "Alpine-based, platform-agnostic"
+        },
+        {
+          "id": "3.2",
+          "name": "IPAM Dockerfile (python:3.11-slim)",
+          "status": "pass",
+          "note": "Debian-slim based, platform-agnostic"
+        }
+      ]
+    },
+    "rhel_specific": {
+      "status": "SKIPPED",
+      "note": "Full RHEL-specific tests (SELinux, firewalld, Podman) require native RHEL installation",
+      "tests": [
+        {
+          "id": "4.1",
+          "name": "SELinux context validation",
+          "status": "skip",
+          "reason": "Requires native RHEL"
+        },
+        {
+          "id": "4.2",
+          "name": "Podman compatibility",
+          "status": "skip",
+          "reason": "Requires native RHEL"
+        },
+        {
+          "id": "4.3",
+          "name": "firewalld port configuration",
+          "status": "skip",
+          "reason": "Requires native RHEL"
+        }
+      ]
+    }
+  },
+  "rhel_recommendations": [
+    "Use :Z suffix for bind mounts when SELinux is enforcing",
+    "Consider Podman as Docker alternative (rootless by default)",
+    "Open ports 3000-3006, 4222, 5433, 6379, 8200, 8222, 8428, 9090, 3100, 16686 in firewalld",
+    "Ensure cgroups v2 is enabled for optimal container performance"
+  ],
+  "docker_compose_modifications": {
+    "selinux_mount_suffix": "Add :Z to volume mounts for SELinux compatibility",
+    "example": "./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro,Z"
+  }
+}

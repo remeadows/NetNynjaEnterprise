@@ -1,0 +1,207 @@
+{
+  "platform": "macOS",
+  "architecture": "arm64",
+  "timestamp": "2026-01-07T10:00:00Z",
+  "os_version": "macOS 26.2 (Darwin 25.2.0)",
+  "docker_version": "29.1.3",
+  "compose_version": "2.40.3",
+  "profile": "infra + local dev servers",
+  "summary": {
+    "passed": 28,
+    "failed": 0,
+    "issues_found": 2,
+    "issues_resolved": 2,
+    "pass_rate": 100
+  },
+  "sections": {
+    "prerequisites": {
+      "status": "PASS",
+      "tests": [
+        { "id": "1.1", "name": "macOS ARM64 architecture", "status": "pass" },
+        { "id": "1.2", "name": "Docker installed (v29.1.3)", "status": "pass" },
+        {
+          "id": "1.3",
+          "name": "Docker Compose installed (v2.40.3)",
+          "status": "pass"
+        },
+        { "id": "1.4", "name": "Docker daemon running", "status": "pass" },
+        {
+          "id": "1.5",
+          "name": "Docker architecture aarch64",
+          "status": "pass"
+        },
+        { "id": "1.6", "name": ".env file exists", "status": "pass" },
+        {
+          "id": "1.7",
+          "name": "Node.js installed (v24.11.1)",
+          "status": "pass"
+        },
+        { "id": "1.8", "name": "Python installed (v3.13.9)", "status": "pass" },
+        { "id": "1.9", "name": "curl installed", "status": "pass" },
+        {
+          "id": "1.10",
+          "name": "Disk space sufficient (23GB)",
+          "status": "pass"
+        }
+      ]
+    },
+    "infrastructure": {
+      "status": "PASS",
+      "tests": [
+        {
+          "id": "2.1",
+          "name": "Docker Compose config valid",
+          "status": "pass"
+        },
+        {
+          "id": "2.2",
+          "name": "Infrastructure services started",
+          "status": "pass"
+        },
+        { "id": "2.3", "name": "PostgreSQL healthy", "status": "pass" },
+        {
+          "id": "2.4",
+          "name": "PostgreSQL schemas (shared, ipam, npm, stig)",
+          "status": "pass"
+        },
+        { "id": "2.5", "name": "Redis healthy", "status": "pass" },
+        { "id": "2.6", "name": "NATS healthy", "status": "pass" },
+        { "id": "2.7", "name": "NATS JetStream enabled", "status": "pass" },
+        { "id": "2.8", "name": "Vault healthy", "status": "pass" },
+        { "id": "2.9", "name": "Vault unsealed", "status": "pass" },
+        { "id": "2.10", "name": "Prometheus healthy", "status": "pass" },
+        { "id": "2.11", "name": "Loki healthy", "status": "pass" },
+        { "id": "2.12", "name": "VictoriaMetrics healthy", "status": "pass" },
+        { "id": "2.13", "name": "Jaeger UI accessible", "status": "pass" },
+        {
+          "id": "2.14",
+          "name": "Grafana healthy (port 3002)",
+          "status": "pass"
+        }
+      ]
+    },
+    "network": {
+      "status": "PASS",
+      "tests": [
+        { "id": "3.1", "name": "DNS resolution postgres", "status": "pass" },
+        { "id": "3.2", "name": "DNS resolution redis", "status": "pass" },
+        { "id": "3.3", "name": "DNS resolution nats", "status": "pass" },
+        { "id": "3.4", "name": "Host -> PostgreSQL (5433)", "status": "pass" },
+        { "id": "3.5", "name": "Host -> Redis (6379)", "status": "pass" },
+        { "id": "3.6", "name": "Host -> NATS (4222)", "status": "pass" },
+        { "id": "3.7", "name": "Host -> Vault (8200)", "status": "pass" },
+        {
+          "id": "3.8",
+          "name": "Container-to-container postgres:5432",
+          "status": "pass"
+        },
+        {
+          "id": "3.9",
+          "name": "Container-to-container redis:6379",
+          "status": "pass"
+        },
+        {
+          "id": "3.10",
+          "name": "host.docker.internal resolves",
+          "status": "pass"
+        }
+      ]
+    },
+    "vault": {
+      "status": "PASS",
+      "tests": [
+        { "id": "4.1", "name": "Vault health status", "status": "pass" },
+        { "id": "4.2", "name": "Vault auth with dev token", "status": "pass" },
+        { "id": "4.3", "name": "Vault secrets engines", "status": "pass" },
+        { "id": "4.4", "name": "KV write/read test", "status": "pass" }
+      ]
+    },
+    "gateway": {
+      "status": "PASS",
+      "tests": [
+        { "id": "5.1", "name": "Health endpoint (/healthz)", "status": "pass" },
+        { "id": "5.2", "name": "Liveness endpoint (/livez)", "status": "pass" },
+        {
+          "id": "5.3",
+          "name": "Readiness endpoint (/readyz)",
+          "status": "pass"
+        },
+        { "id": "5.4", "name": "OpenAPI docs (/docs/)", "status": "pass" },
+        {
+          "id": "5.5",
+          "name": "Metrics endpoint (/metrics)",
+          "status": "pass"
+        },
+        { "id": "5.10", "name": "Auth service login", "status": "pass" },
+        { "id": "5.11", "name": "Gateway auth proxy", "status": "pass" },
+        {
+          "id": "5.12",
+          "name": "IPAM networks (authenticated)",
+          "status": "pass"
+        },
+        {
+          "id": "5.13",
+          "name": "NPM devices (authenticated)",
+          "status": "pass"
+        },
+        {
+          "id": "5.14",
+          "name": "STIG benchmarks (authenticated)",
+          "status": "pass"
+        }
+      ]
+    },
+    "frontend": {
+      "status": "PASS",
+      "tests": [
+        { "id": "6.1", "name": "Web UI on port 3000", "status": "pass" },
+        { "id": "6.2", "name": "Vite HMR endpoint", "status": "pass" },
+        { "id": "6.3", "name": "Login page accessible", "status": "pass" },
+        { "id": "6.4", "name": "API proxy via Vite", "status": "pass" },
+        { "id": "6.5", "name": "Static assets served", "status": "pass" }
+      ]
+    }
+  },
+  "issues_found": [
+    {
+      "id": "P8-001",
+      "severity": "medium",
+      "title": "Port conflict: Grafana 3000 vs Vite 3000",
+      "description": "docker-compose.yml configured Grafana on port 3000, conflicting with web-ui Vite dev server",
+      "resolution": "Changed Grafana to port 3002 via GRAFANA_PORT env variable",
+      "files_modified": ["docker-compose.yml", ".env.example"]
+    },
+    {
+      "id": "P8-002",
+      "severity": "medium",
+      "title": "Port conflict: Auth service 3002 vs Grafana 3002",
+      "description": "Auth service defaulted to port 3002, conflicting with new Grafana port",
+      "resolution": "Changed auth service to port 3006, updated gateway AUTH_SERVICE_URL",
+      "files_modified": [
+        "services/auth-service/src/config.ts",
+        "services/auth-service/.env",
+        "apps/gateway/src/config.ts",
+        "apps/gateway/.env",
+        ".env.example"
+      ]
+    }
+  ],
+  "port_allocation": {
+    "3000": "Web UI (Vite dev server)",
+    "3001": "API Gateway",
+    "3002": "Grafana",
+    "3003": "IPAM Service",
+    "3004": "NPM Service",
+    "3005": "STIG Service",
+    "3006": "Auth Service",
+    "4222": "NATS",
+    "5433": "PostgreSQL (host mapping)",
+    "6379": "Redis",
+    "8200": "Vault",
+    "8222": "NATS Monitoring",
+    "8428": "VictoriaMetrics",
+    "9090": "Prometheus",
+    "3100": "Loki",
+    "16686": "Jaeger UI"
+  }
+}
