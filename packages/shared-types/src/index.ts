@@ -3,7 +3,7 @@
  * Common types used across all modules
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 
 // ============================================
 // Common Types
@@ -19,7 +19,7 @@ export interface PaginationParams {
   page: number;
   limit: number;
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
 }
 
 export interface PaginatedResponse<T> {
@@ -49,7 +49,7 @@ export interface ApiError {
 // User & Authentication
 // ============================================
 
-export type UserRole = 'admin' | 'operator' | 'viewer';
+export type UserRole = "admin" | "operator" | "viewer";
 
 export interface User extends BaseEntity {
   username: string;
@@ -57,6 +57,7 @@ export interface User extends BaseEntity {
   role: UserRole;
   isActive: boolean;
   lastLogin?: Date;
+  failedLoginAttempts?: number;
 }
 
 export interface JWTPayload {
@@ -84,7 +85,7 @@ export const RegisterSchema = z.object({
   username: z.string().min(3).max(50),
   email: z.string().email(),
   password: z.string().min(8).max(128),
-  role: z.enum(['admin', 'operator', 'viewer']).default('viewer'),
+  role: z.enum(["admin", "operator", "viewer"]).default("viewer"),
 });
 
 export type LoginInput = z.infer<typeof LoginSchema>;
@@ -94,7 +95,7 @@ export type RegisterInput = z.infer<typeof RegisterSchema>;
 // Audit Log
 // ============================================
 
-export type AuditModule = 'ipam' | 'npm' | 'stig' | 'auth' | 'system';
+export type AuditModule = "ipam" | "npm" | "stig" | "auth" | "system";
 
 export interface AuditLogEntry extends BaseEntity {
   userId?: string;
@@ -112,7 +113,7 @@ export interface AuditLogEntry extends BaseEntity {
 // ============================================
 
 export interface HealthStatus {
-  status: 'healthy' | 'degraded' | 'unhealthy';
+  status: "healthy" | "degraded" | "unhealthy";
   version: string;
   uptime: number;
   timestamp: string;
@@ -121,7 +122,7 @@ export interface HealthStatus {
 
 export interface ServiceHealth {
   name: string;
-  status: 'up' | 'down' | 'degraded';
+  status: "up" | "down" | "degraded";
   latency?: number;
   message?: string;
 }
@@ -130,6 +131,6 @@ export interface ServiceHealth {
 // Export modules
 // ============================================
 
-export * from './ipam';
-export * from './npm';
-export * from './stig';
+export * from "./ipam";
+export * from "./npm";
+export * from "./stig";

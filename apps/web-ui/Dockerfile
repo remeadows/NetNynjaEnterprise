@@ -17,14 +17,17 @@ WORKDIR /app
 # Copy package.json for deps reference
 COPY package.json ./
 
-# Install dependencies (shared packages will be mounted)
-RUN npm install 2>/dev/null || true
+# Create a modified package.json without workspace dependencies for container build
+RUN cat package.json | sed 's/"@netnynja\/shared-types": "\*",//g' | sed 's/"@netnynja\/shared-ui": "\*",//g' > package.temp.json && mv package.temp.json package.json
 
-EXPOSE 5173
+# Install all dependencies including dev deps
+RUN npm install --legacy-peer-deps
+
+EXPOSE 3000
 ENV NODE_ENV=development
 
-# Source will be mounted as volume in docker-compose
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Create symlinks at runtime (after volume mounts) and start vite
+CMD ["sh", "-c", "ln -sf /app/node_modules /packages/shared-ui/node_modules 2>/dev/null; ln -sf /app/node_modules /packages/shared-types/node_modules 2>/dev/null; npx vite --host 0.0.0.0 --port 3000"]
 
 # ============================================
 # Build stage (for production)

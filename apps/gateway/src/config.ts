@@ -68,7 +68,13 @@ const ConfigSchema = z.object({
   API_VERSION: z.string().default("v1"),
 
   // Backend Services
-  AUTH_SERVICE_URL: z.string().default("http://localhost:3002"),
+  AUTH_SERVICE_URL: z.string().default("http://localhost:3006"),
+
+  // Encryption
+  CREDENTIAL_ENCRYPTION_KEY: z
+    .string()
+    .min(32)
+    .default("netnynja-dev-encryption-key-32ch"),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

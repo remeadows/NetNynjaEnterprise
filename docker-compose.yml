@@ -99,7 +99,7 @@ services:
       - "8200:8200"
     healthcheck:
       <<: *healthcheck-defaults
-      test: ["CMD", "vault", "status"]
+      test: ["CMD", "sh", "-c", "VAULT_ADDR=http://127.0.0.1:8200 vault status"]
     logging: *default-logging
     networks:
       - netnynja-network
@@ -110,7 +110,7 @@ services:
 
   victoriametrics:
     image: victoriametrics/victoria-metrics:v1.93.0
-    profiles: ["infra", "npm", "stig"]
+    profiles: ["infra", "ipam", "npm", "stig"]
     container_name: netnynja-victoriametrics
     restart: unless-stopped
     command:
@@ -123,7 +123,7 @@ services:
       - "8428:8428"
     healthcheck:
       <<: *healthcheck-defaults
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8428/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8428/health"]
     logging: *default-logging
     networks:
       - netnynja-network
@@ -215,7 +215,7 @@ services:
       - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./infrastructure/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
-      - "3000:3000"
+      - "${GRAFANA_PORT:-3002}:3000"
     depends_on:
       - prometheus
       - loki
@@ -249,9 +249,11 @@ services:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_DEV_TOKEN:-netnynja-dev-token}
       JAEGER_ENDPOINT: http://jaeger:4318/v1/traces
+      AUTH_SERVICE_URL: http://auth-service:3006
+      JWT_SECRET: ${JWT_SECRET:-netnynja-dev-jwt-secret-2025}
     volumes:
       - ./apps/gateway/src:/app/src:ro
-      - ./packages:/packages:ro
+      - ./packages:/packages
     ports:
       - "3001:3001"
     depends_on:
@@ -261,9 +263,46 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
+      auth-service:
+        condition: service_healthy
     healthcheck:
       <<: *healthcheck-defaults
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001/health"]
+    logging: *default-logging
+    networks:
+      - netnynja-network
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+      target: development
+    profiles: ["ipam", "npm", "stig"]
+    container_name: netnynja-auth-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3006
+      HOST: "0.0.0.0"
+      POSTGRES_URL: postgresql://${POSTGRES_USER:-netnynja}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-netnynja}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-netnynja-dev-jwt-secret-2025}
+      JWT_ACCESS_EXPIRY: "15m"
+      JWT_REFRESH_EXPIRY: "7d"
+      LOG_LEVEL: debug
+    volumes:
+      - ./services/auth-service/src:/app/src:ro
+      - ./packages:/packages
+    ports:
+      - "3006:3006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3006/healthz"]
     logging: *default-logging
     networks:
       - netnynja-network
@@ -280,9 +319,17 @@ services:
       VITE_API_URL: http://localhost:3001
     volumes:
       - ./apps/web-ui/src:/app/src:ro
-      - ./packages/shared-ui:/packages/shared-ui:ro
+      - ./apps/web-ui/public:/app/public:ro
+      - ./apps/web-ui/index.html:/app/index.html:ro
+      - ./apps/web-ui/vite.config.ts:/app/vite.config.ts:ro
+      - ./apps/web-ui/tailwind.config.js:/app/tailwind.config.js:ro
+      - ./apps/web-ui/postcss.config.js:/app/postcss.config.js:ro
+      - ./apps/web-ui/tsconfig.json:/app/tsconfig.json:ro
+      - ./apps/web-ui/tsconfig.node.json:/app/tsconfig.node.json:ro
+      - ./packages/shared-ui:/packages/shared-ui
+      - ./packages/shared-types:/packages/shared-types
     ports:
-      - "5173:5173"
+      - "3000:3000"
     depends_on:
       - gateway
     logging: *default-logging

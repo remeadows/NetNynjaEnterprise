@@ -2,8 +2,8 @@
  * NetNynja IPAM - Type Definitions
  */
 
-import { z } from 'zod';
-import type { BaseEntity } from './index';
+import { z } from "zod";
+import type { BaseEntity } from "./index";
 
 // ============================================
 // Network Types
@@ -15,6 +15,7 @@ export interface Network extends BaseEntity {
   vlanId?: number;
   description?: string;
   location?: string;
+  site?: string;
   gateway?: string;
   dnsServers?: string[];
   isActive: boolean;
@@ -34,7 +35,7 @@ export interface IPAddress extends BaseEntity {
   discoveredAt?: Date;
 }
 
-export type IPStatus = 'active' | 'inactive' | 'reserved' | 'dhcp' | 'unknown';
+export type IPStatus = "active" | "inactive" | "reserved" | "dhcp" | "unknown";
 
 // ============================================
 // Scanning Types
@@ -52,8 +53,8 @@ export interface ScanJob extends BaseEntity {
   errorMessage?: string;
 }
 
-export type ScanType = 'ping' | 'tcp' | 'nmap' | 'arp';
-export type ScanStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type ScanType = "ping" | "tcp" | "nmap" | "arp";
+export type ScanStatus = "pending" | "running" | "completed" | "failed";
 
 export interface ScanResult {
   address: string;
@@ -75,15 +76,17 @@ export const CreateNetworkSchema = z.object({
   vlanId: z.number().int().min(1).max(4094).optional(),
   description: z.string().max(1000).optional(),
   location: z.string().max(255).optional(),
+  site: z.string().max(255).optional(),
   gateway: z.string().ip().optional(),
   dnsServers: z.array(z.string().ip()).optional(),
+  isActive: z.boolean().optional(),
 });
 
 export const UpdateNetworkSchema = CreateNetworkSchema.partial();
 
 export const StartScanSchema = z.object({
   networkId: z.string().uuid(),
-  scanType: z.enum(['ping', 'tcp', 'nmap', 'arp']).default('ping'),
+  scanType: z.enum(["ping", "tcp", "nmap", "arp"]).default("ping"),
 });
 
 export type CreateNetworkInput = z.infer<typeof CreateNetworkSchema>;

@@ -1,31 +1,35 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuthStore } from './stores/auth';
-import { useThemeStore } from './stores/theme';
-import { useEffect } from 'react';
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useAuthStore } from "./stores/auth";
+import { useThemeStore } from "./stores/theme";
+import { useEffect } from "react";
 
 // Layouts
-import { MainLayout } from './components/layouts/MainLayout';
-import { AuthLayout } from './components/layouts/AuthLayout';
+import { MainLayout } from "./components/layouts/MainLayout";
+import { AuthLayout } from "./components/layouts/AuthLayout";
 
 // Auth pages
-import { LoginPage } from './pages/auth/LoginPage';
+import { LoginPage } from "./pages/auth/LoginPage";
 
 // Dashboard
-import { DashboardPage } from './pages/dashboard/DashboardPage';
+import { DashboardPage } from "./pages/dashboard/DashboardPage";
 
 // IPAM module
-import { IPAMNetworksPage } from './modules/ipam/pages/NetworksPage';
-import { IPAMNetworkDetailPage } from './modules/ipam/pages/NetworkDetailPage';
+import { IPAMNetworksPage } from "./modules/ipam/pages/NetworksPage";
+import { IPAMNetworkDetailPage } from "./modules/ipam/pages/NetworkDetailPage";
 
 // NPM module
-import { NPMDevicesPage } from './modules/npm/pages/DevicesPage';
-import { NPMDeviceDetailPage } from './modules/npm/pages/DeviceDetailPage';
-import { NPMAlertsPage } from './modules/npm/pages/AlertsPage';
+import { NPMDevicesPage } from "./modules/npm/pages/DevicesPage";
+import { NPMDeviceDetailPage } from "./modules/npm/pages/DeviceDetailPage";
+import { NPMAlertsPage } from "./modules/npm/pages/AlertsPage";
+import { SNMPv3CredentialsPage } from "./modules/npm/pages/SNMPv3CredentialsPage";
 
 // STIG module
-import { STIGBenchmarksPage } from './modules/stig/pages/BenchmarksPage';
-import { STIGAssetsPage } from './modules/stig/pages/AssetsPage';
-import { STIGCompliancePage } from './modules/stig/pages/CompliancePage';
+import { STIGBenchmarksPage } from "./modules/stig/pages/BenchmarksPage";
+import { STIGAssetsPage } from "./modules/stig/pages/AssetsPage";
+import { STIGCompliancePage } from "./modules/stig/pages/CompliancePage";
+
+// Settings module
+import { UsersPage } from "./modules/settings/pages/UsersPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, checkAuth } = useAuthStore();
@@ -46,9 +50,9 @@ function App() {
 
   useEffect(() => {
     if (isDark) {
-      document.documentElement.classList.add('dark');
+      document.documentElement.classList.add("dark");
     } else {
-      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove("dark");
     }
   }, [isDark]);
 
@@ -85,6 +89,7 @@ function App() {
             <Route path="devices" element={<NPMDevicesPage />} />
             <Route path="devices/:id" element={<NPMDeviceDetailPage />} />
             <Route path="alerts" element={<NPMAlertsPage />} />
+            <Route path="credentials" element={<SNMPv3CredentialsPage />} />
           </Route>
 
           {/* STIG Module */}
@@ -93,6 +98,12 @@ function App() {
             <Route path="benchmarks" element={<STIGBenchmarksPage />} />
             <Route path="assets" element={<STIGAssetsPage />} />
             <Route path="compliance" element={<STIGCompliancePage />} />
+          </Route>
+
+          {/* Settings Module */}
+          <Route path="/settings">
+            <Route index element={<Navigate to="/settings/users" replace />} />
+            <Route path="users" element={<UsersPage />} />
           </Route>
         </Route>
 

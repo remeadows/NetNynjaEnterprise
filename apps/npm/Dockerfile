@@ -13,8 +13,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=off \
     PIP_DISABLE_PIP_VERSION_CHECK=on
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Enable non-free repository for snmp-mibs-downloader and install system dependencies
+# Debian bookworm uses DEB822 format, so we modify the existing sources file
+RUN sed -i 's/Components: main/Components: main non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y --no-install-recommends \
     # SNMP tools
     snmp \
     libsnmp-dev \
@@ -40,10 +42,9 @@ RUN pip install --upgrade pip && \
     pip install hatch
 
 # Copy project files
-COPY pyproject.toml ./
-RUN pip install -e ".[dev]"
-
+COPY pyproject.toml README.md ./
 COPY src/ ./src/
+RUN pip install -e ".[dev]"
 
 # Default command for development
 CMD ["python", "-m", "uvicorn", "npm.main:app", "--host", "0.0.0.0", "--port", "3004", "--reload"]
@@ -55,10 +56,9 @@ FROM base AS collector
 
 RUN pip install --upgrade pip
 
-COPY pyproject.toml ./
-RUN pip install .
-
+COPY pyproject.toml README.md ./
 COPY src/ ./src/
+RUN pip install .
 
 # Collector worker command
 CMD ["python", "-m", "npm.collectors.snmp_poller"]
@@ -70,10 +70,9 @@ FROM base AS alerts
 
 RUN pip install --upgrade pip
 
-COPY pyproject.toml ./
-RUN pip install .
-
+COPY pyproject.toml README.md ./
 COPY src/ ./src/
+RUN pip install .
 
 # Alert service command
 CMD ["python", "-m", "npm.services.alert_service"]
@@ -85,7 +84,7 @@ FROM base AS builder
 
 RUN pip install --upgrade pip build
 
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 COPY src/ ./src/
 
 RUN pip wheel --no-deps --wheel-dir /app/wheels .

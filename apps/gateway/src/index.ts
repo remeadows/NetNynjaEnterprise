@@ -19,6 +19,7 @@ import lokiLoggingPlugin from "./plugins/loki-logging";
 import metricsPlugin from "./plugins/metrics";
 import healthRoutes from "./routes/health";
 import authRoutes from "./routes/auth";
+import usersRoutes from "./routes/users";
 import ipamRoutes from "./routes/ipam";
 import npmRoutes from "./routes/npm";
 import stigRoutes from "./routes/stig";
@@ -77,6 +78,7 @@ async function start(): Promise<void> {
 
     // Register API routes
     await fastify.register(authRoutes, { prefix: "/api/v1/auth" });
+    await fastify.register(usersRoutes, { prefix: "/api/v1/users" });
     await fastify.register(ipamRoutes, { prefix: "/api/v1/ipam" });
     await fastify.register(npmRoutes, { prefix: "/api/v1/npm" });
     await fastify.register(stigRoutes, { prefix: "/api/v1/stig" });

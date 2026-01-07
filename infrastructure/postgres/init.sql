@@ -90,6 +90,7 @@ CREATE TABLE ipam.networks (
     vlan_id INTEGER,
     description TEXT,
     location VARCHAR(255),
+    site VARCHAR(255),
     gateway INET,
     dns_servers INET[],
     is_active BOOLEAN DEFAULT true,
@@ -143,6 +144,32 @@ CREATE INDEX idx_scan_history_started ON ipam.scan_history(started_at DESC);
 -- NPM SCHEMA
 -- ============================================
 
+-- SNMPv3 Credentials (reusable across devices)
+CREATE TABLE npm.snmpv3_credentials (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    -- SNMPv3 USM parameters
+    username VARCHAR(255) NOT NULL,
+    security_level VARCHAR(20) NOT NULL DEFAULT 'authPriv'
+        CHECK (security_level IN ('noAuthNoPriv', 'authNoPriv', 'authPriv')),
+    -- Authentication (FIPS-compliant algorithms only)
+    auth_protocol VARCHAR(20) CHECK (auth_protocol IN ('SHA', 'SHA-224', 'SHA-256', 'SHA-384', 'SHA-512')),
+    auth_password_encrypted TEXT,
+    -- Privacy (FIPS-compliant algorithms only - AES variants)
+    priv_protocol VARCHAR(20) CHECK (priv_protocol IN ('AES', 'AES-192', 'AES-256')),
+    priv_password_encrypted TEXT,
+    -- Context
+    context_name VARCHAR(255),
+    context_engine_id VARCHAR(255),
+    -- Metadata
+    created_by UUID REFERENCES shared.users(id),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_snmpv3_credentials_name ON npm.snmpv3_credentials(name);
+
 -- Monitored devices
 CREATE TABLE npm.devices (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -151,19 +178,29 @@ CREATE TABLE npm.devices (
     device_type VARCHAR(100),
     vendor VARCHAR(100),
     model VARCHAR(100),
-    snmp_community_encrypted TEXT,
-    snmp_version VARCHAR(10) DEFAULT 'v2c',
+    -- Polling methods (can be ICMP, SNMPv3, or both)
+    poll_icmp BOOLEAN DEFAULT true,
+    poll_snmp BOOLEAN DEFAULT false,
+    snmpv3_credential_id UUID REFERENCES npm.snmpv3_credentials(id) ON DELETE SET NULL,
+    snmp_port INTEGER DEFAULT 161,
     ssh_enabled BOOLEAN DEFAULT false,
     poll_interval INTEGER DEFAULT 60,
     is_active BOOLEAN DEFAULT true,
     last_poll TIMESTAMPTZ,
+    last_icmp_poll TIMESTAMPTZ,
+    last_snmp_poll TIMESTAMPTZ,
     status VARCHAR(50) DEFAULT 'unknown',
+    icmp_status VARCHAR(50) DEFAULT 'unknown',
+    snmp_status VARCHAR(50) DEFAULT 'unknown',
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    -- Ensure at least one polling method is enabled
+    CONSTRAINT device_polling_method CHECK (poll_icmp = true OR poll_snmp = true)
 );
 
 CREATE INDEX idx_npm_devices_ip ON npm.devices(ip_address);
 CREATE INDEX idx_npm_devices_status ON npm.devices(status);
+CREATE INDEX idx_npm_devices_credential ON npm.devices(snmpv3_credential_id);
 
 -- Interfaces
 CREATE TABLE npm.interfaces (
@@ -323,6 +360,10 @@ CREATE TRIGGER update_npm_devices_updated_at
     BEFORE UPDATE ON npm.devices
     FOR EACH ROW EXECUTE FUNCTION shared.update_updated_at();
 
+CREATE TRIGGER update_snmpv3_credentials_updated_at
+    BEFORE UPDATE ON npm.snmpv3_credentials
+    FOR EACH ROW EXECUTE FUNCTION shared.update_updated_at();
+
 CREATE TRIGGER update_stig_targets_updated_at
     BEFORE UPDATE ON stig.targets
     FOR EACH ROW EXECUTE FUNCTION shared.update_updated_at();
@@ -331,13 +372,13 @@ CREATE TRIGGER update_stig_targets_updated_at
 -- SEED DATA (Development Only)
 -- ============================================
 
--- Default admin user (password: admin - CHANGE IN PRODUCTION)
--- Argon2id hash of 'admin'
+-- Default admin user (password: adminadmin - CHANGE IN PRODUCTION)
+-- Argon2id hash of 'adminadmin'
 INSERT INTO shared.users (username, email, password_hash, role)
 VALUES (
     'admin',
     'admin@netnynja.local',
-    '$argon2id$v=19$m=65536,t=3,p=4$CHANGE_THIS_HASH_IN_PRODUCTION',
+    '$argon2id$v=19$m=65536,t=3,p=4$RQdT9l4Tz2PIt+0pF2DlcA$/uRbwmrYDTQg+MiqsohbLZRy+dbu/WZUThM/v3sG2jw',
     'admin'
 ) ON CONFLICT (username) DO NOTHING;
 

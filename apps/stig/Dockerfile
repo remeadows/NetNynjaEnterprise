@@ -43,10 +43,9 @@ RUN pip install --upgrade pip && \
     pip install hatch
 
 # Copy project files
-COPY pyproject.toml ./
-RUN pip install -e ".[dev]"
-
+COPY pyproject.toml README.md ./
 COPY src/ ./src/
+RUN pip install -e ".[dev]"
 
 # Default command for development
 CMD ["python", "-m", "uvicorn", "stig.main:app", "--host", "0.0.0.0", "--port", "3005", "--reload"]
@@ -58,10 +57,9 @@ FROM base AS collector
 
 RUN pip install --upgrade pip
 
-COPY pyproject.toml ./
-RUN pip install .
-
+COPY pyproject.toml README.md ./
 COPY src/ ./src/
+RUN pip install .
 
 # Collector worker command
 CMD ["python", "-m", "stig.collectors.nats_handler"]
@@ -73,10 +71,9 @@ FROM base AS reports
 
 RUN pip install --upgrade pip
 
-COPY pyproject.toml ./
-RUN pip install .
-
+COPY pyproject.toml README.md ./
 COPY src/ ./src/
+RUN pip install .
 
 # Reports worker command
 CMD ["python", "-m", "stig.reports.generator"]
@@ -88,7 +85,7 @@ FROM base AS builder
 
 RUN pip install --upgrade pip build
 
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 COPY src/ ./src/
 
 RUN pip wheel --no-deps --wheel-dir /app/wheels .
