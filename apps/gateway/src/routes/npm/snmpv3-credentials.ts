@@ -13,7 +13,6 @@ import { config } from "../../config";
 // Encryption utilities using AES-256-GCM (FIPS compliant)
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
-const AUTH_TAG_LENGTH = 16;
 
 function encrypt(text: string): string {
   const key = crypto.scryptSync(config.CREDENTIAL_ENCRYPTION_KEY, "salt", 32);
@@ -32,13 +31,16 @@ function decrypt(encryptedData: string): string {
   const key = crypto.scryptSync(config.CREDENTIAL_ENCRYPTION_KEY, "salt", 32);
   const parts = encryptedData.split(":");
 
-  if (parts.length !== 3) {
+  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) {
     throw new Error("Invalid encrypted data format");
   }
 
-  const iv = Buffer.from(parts[0], "hex");
-  const authTag = Buffer.from(parts[1], "hex");
+  const ivHex = parts[0];
+  const authTagHex = parts[1];
   const encrypted = parts[2];
+
+  const iv = Buffer.from(ivHex, "hex");
+  const authTag = Buffer.from(authTagHex, "hex");
 
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(authTag);
@@ -575,7 +577,7 @@ const snmpv3CredentialsRoutes: FastifyPluginAsync = async (fastify) => {
         { credentialId: result.rows[0].id, name: result.rows[0].name },
         "SNMPv3 credential deleted",
       );
-      reply.status(204).send();
+      return reply.status(204).send();
     },
   );
 

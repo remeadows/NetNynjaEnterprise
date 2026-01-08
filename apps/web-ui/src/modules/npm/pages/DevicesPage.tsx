@@ -11,7 +11,7 @@ import {
   Badge,
 } from "@netnynja/shared-ui";
 import type { ColumnDef } from "@tanstack/react-table";
-import type { Device, SNMPv3Credential } from "@netnynja/shared-types";
+import type { Device } from "@netnynja/shared-types";
 import { useNPMStore } from "../../../stores/npm";
 import { useSNMPv3CredentialsStore } from "../../../stores/snmpv3-credentials";
 

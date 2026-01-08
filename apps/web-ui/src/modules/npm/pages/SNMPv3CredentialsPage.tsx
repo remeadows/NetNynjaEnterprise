@@ -38,11 +38,12 @@ const privProtocolOptions = [
   { value: "AES-256", label: "AES-256 (Recommended)" },
 ];
 
-const securityLevelVariants = {
-  noAuthNoPriv: "warning",
-  authNoPriv: "default",
-  authPriv: "success",
-} as const;
+const securityLevelVariants: Record<string, "warning" | "default" | "success"> =
+  {
+    noAuthNoPriv: "warning",
+    authNoPriv: "default",
+    authPriv: "success",
+  };
 
 export function SNMPv3CredentialsPage() {
   const {

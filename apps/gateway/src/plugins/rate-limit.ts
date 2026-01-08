@@ -79,7 +79,7 @@ const rateLimitPlugin: FastifyPluginAsync = async (fastify) => {
 
       // Use user ID if authenticated, otherwise use IP
       if (request.user) {
-        return `user:${request.user.userId}`;
+        return `user:${request.user.sub}`;
       }
       return `ip:${request.ip}`;
     },

@@ -336,7 +336,7 @@ const metricsPlugin: FastifyPluginAsync = async (fastify) => {
       return metricsData;
     } catch (err) {
       logger.error({ err }, "Failed to generate metrics");
-      reply.code(500).send("Failed to generate metrics");
+      return reply.code(500).send("Failed to generate metrics");
     }
   });
 

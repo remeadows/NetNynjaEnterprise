@@ -334,7 +334,7 @@ const usersRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      const currentUserId = request.user?.id;
+      const currentUserId = request.user?.sub;
 
       // Prevent self-deletion
       if (id === currentUserId) {

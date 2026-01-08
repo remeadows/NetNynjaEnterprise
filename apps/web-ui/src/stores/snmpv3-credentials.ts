@@ -70,9 +70,7 @@ interface SNMPv3CredentialsState {
     targetIp: string,
     port?: number,
   ) => Promise<TestCredentialResult>;
-  getCredentialDevices: (
-    id: string,
-  ) => Promise<{
+  getCredentialDevices: (id: string) => Promise<{
     credential: { id: string; name: string };
     devices: Array<{
       id: string;
@@ -87,7 +85,7 @@ interface SNMPv3CredentialsState {
 }
 
 export const useSNMPv3CredentialsStore = create<SNMPv3CredentialsState>(
-  (set, get) => ({
+  (set) => ({
     credentials: [],
     selectedCredential: null,
     pagination: null,
