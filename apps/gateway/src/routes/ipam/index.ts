@@ -4,9 +4,368 @@
 
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { exec } from "child_process";
+import { promisify } from "util";
+import * as os from "os";
+import * as net from "net";
 import { pool } from "../../db";
 import { logger } from "../../logger";
 import reportsRoutes from "./reports";
+
+const execAsync = promisify(exec);
+
+/**
+ * Generate all host IPs from a CIDR notation
+ */
+function getCidrHosts(cidr: string): string[] {
+  const [baseIp, prefixStr] = cidr.split("/");
+  const prefix = parseInt(prefixStr, 10);
+
+  if (prefix < 8 || prefix > 30) {
+    throw new Error("Only /8 to /30 networks supported");
+  }
+
+  const parts = baseIp.split(".").map((p) => parseInt(p, 10));
+  const baseNum =
+    (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3];
+  const hostBits = 32 - prefix;
+  const numHosts = Math.pow(2, hostBits);
+
+  // Skip network and broadcast addresses
+  const hosts: string[] = [];
+  for (let i = 1; i < numHosts - 1; i++) {
+    const ip = baseNum + i;
+    hosts.push(
+      `${(ip >> 24) & 255}.${(ip >> 16) & 255}.${(ip >> 8) & 255}.${ip & 255}`,
+    );
+  }
+
+  return hosts;
+}
+
+/**
+ * Ping a single IP address and return result
+ */
+async function pingHost(
+  ip: string,
+  timeoutSec: number = 2,
+): Promise<{ ip: string; alive: boolean; latency?: number }> {
+  const isWindows = os.platform() === "win32";
+  const cmd = isWindows
+    ? `ping -n 1 -w ${timeoutSec * 1000} ${ip}`
+    : `ping -c 1 -W ${timeoutSec} ${ip}`;
+
+  try {
+    const { stdout } = await execAsync(cmd, {
+      timeout: (timeoutSec + 2) * 1000,
+    });
+
+    // Parse latency from output
+    let latency: number | undefined;
+    if (isWindows) {
+      const match =
+        stdout.match(/Average\s*=\s*(\d+)ms/i) ||
+        stdout.match(/time[=<](\d+)ms/i);
+      if (match) latency = parseInt(match[1], 10);
+    } else {
+      const match = stdout.match(/time[=](\d+\.?\d*)\s*ms/i);
+      if (match) latency = parseFloat(match[1]);
+    }
+
+    return { ip, alive: true, latency };
+  } catch {
+    return { ip, alive: false };
+  }
+}
+
+/**
+ * Run ping scan on a network in batches
+ */
+async function runPingScan(
+  cidr: string,
+  scanId: string,
+  networkId: string,
+  concurrency: number = 20,
+): Promise<{ total: number; active: number; newIps: number }> {
+  const hosts = getCidrHosts(cidr);
+  const totalIps = hosts.length;
+  let activeCount = 0;
+  let newCount = 0;
+
+  logger.info(
+    { scanId, networkId, cidr, totalHosts: totalIps },
+    "Starting ping scan",
+  );
+
+  // Update scan to running status
+  await pool.query(
+    `UPDATE ipam.scan_history SET status = 'running', total_ips = $1 WHERE id = $2`,
+    [totalIps, scanId],
+  );
+
+  // Process in batches
+  for (let i = 0; i < hosts.length; i += concurrency) {
+    const batch = hosts.slice(i, i + concurrency);
+    const results = await Promise.all(batch.map((ip) => pingHost(ip)));
+
+    for (const result of results) {
+      if (result.alive) {
+        activeCount++;
+
+        // Check if IP already exists in database
+        const existingResult = await pool.query(
+          `SELECT id FROM ipam.addresses WHERE network_id = $1 AND address = $2`,
+          [networkId, result.ip],
+        );
+
+        if (existingResult.rows.length === 0) {
+          // New IP - insert it
+          newCount++;
+          await pool.query(
+            `INSERT INTO ipam.addresses (network_id, address, status, last_seen)
+             VALUES ($1, $2, 'active', NOW())
+             ON CONFLICT (network_id, address) DO UPDATE
+             SET status = 'active', last_seen = NOW()`,
+            [networkId, result.ip],
+          );
+        } else {
+          // Existing IP - update last_seen
+          await pool.query(
+            `UPDATE ipam.addresses SET status = 'active', last_seen = NOW()
+             WHERE network_id = $1 AND address = $2`,
+            [networkId, result.ip],
+          );
+        }
+      }
+    }
+  }
+
+  return { total: totalIps, active: activeCount, newIps: newCount };
+}
+
+/**
+ * TCP connect to check if a port is open
+ */
+async function tcpConnect(
+  ip: string,
+  port: number,
+  timeoutMs: number = 2000,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let resolved = false;
+
+    const cleanup = (result: boolean) => {
+      if (!resolved) {
+        resolved = true;
+        socket.destroy();
+        resolve(result);
+      }
+    };
+
+    const timeout = setTimeout(() => {
+      cleanup(false);
+    }, timeoutMs);
+
+    socket.on("connect", () => {
+      clearTimeout(timeout);
+      cleanup(true);
+    });
+
+    socket.on("error", () => {
+      clearTimeout(timeout);
+      cleanup(false);
+    });
+
+    socket.on("timeout", () => {
+      clearTimeout(timeout);
+      cleanup(false);
+    });
+
+    try {
+      socket.connect(port, ip);
+    } catch {
+      clearTimeout(timeout);
+      cleanup(false);
+    }
+  });
+}
+
+/**
+ * TCP ping a host by checking common ports
+ */
+async function tcpPingHost(
+  ip: string,
+  ports: number[] = [22, 80, 443, 3389, 445, 23, 21, 25, 53, 8080],
+  timeoutMs: number = 2000,
+): Promise<{ ip: string; alive: boolean; openPorts: number[] }> {
+  const openPorts: number[] = [];
+
+  for (const port of ports) {
+    const isOpen = await tcpConnect(ip, port, timeoutMs);
+    if (isOpen) {
+      openPorts.push(port);
+      // Return early on first open port for speed
+      return { ip, alive: true, openPorts };
+    }
+  }
+
+  return { ip, alive: openPorts.length > 0, openPorts };
+}
+
+/**
+ * Run TCP scan on a network in batches
+ */
+async function runTcpScan(
+  cidr: string,
+  scanId: string,
+  networkId: string,
+  concurrency: number = 20,
+): Promise<{ total: number; active: number; newIps: number }> {
+  const hosts = getCidrHosts(cidr);
+  const totalIps = hosts.length;
+  let activeCount = 0;
+  let newCount = 0;
+
+  logger.info(
+    { scanId, networkId, cidr, totalHosts: totalIps },
+    "Starting TCP scan",
+  );
+
+  // Update scan to running status
+  await pool.query(
+    `UPDATE ipam.scan_history SET status = 'running', total_ips = $1 WHERE id = $2`,
+    [totalIps, scanId],
+  );
+
+  // Process in batches
+  for (let i = 0; i < hosts.length; i += concurrency) {
+    const batch = hosts.slice(i, i + concurrency);
+    const results = await Promise.all(batch.map((ip) => tcpPingHost(ip)));
+
+    for (const result of results) {
+      if (result.alive) {
+        activeCount++;
+
+        // Check if IP already exists in database
+        const existingResult = await pool.query(
+          `SELECT id FROM ipam.addresses WHERE network_id = $1 AND address = $2`,
+          [networkId, result.ip],
+        );
+
+        if (existingResult.rows.length === 0) {
+          // New IP - insert it
+          newCount++;
+          await pool.query(
+            `INSERT INTO ipam.addresses (network_id, address, status, last_seen)
+             VALUES ($1, $2, 'active', NOW())
+             ON CONFLICT (network_id, address) DO UPDATE
+             SET status = 'active', last_seen = NOW()`,
+            [networkId, result.ip],
+          );
+        } else {
+          // Existing IP - update last_seen
+          await pool.query(
+            `UPDATE ipam.addresses SET status = 'active', last_seen = NOW()
+             WHERE network_id = $1 AND address = $2`,
+            [networkId, result.ip],
+          );
+        }
+      }
+    }
+  }
+
+  return { total: totalIps, active: activeCount, newIps: newCount };
+}
+
+/**
+ * Run nmap scan on a network
+ */
+async function runNmapScan(
+  cidr: string,
+  scanId: string,
+  networkId: string,
+): Promise<{ total: number; active: number; newIps: number }> {
+  const hosts = getCidrHosts(cidr);
+  const totalIps = hosts.length;
+
+  logger.info(
+    { scanId, networkId, cidr, totalHosts: totalIps },
+    "Starting nmap scan",
+  );
+
+  // Update scan to running status
+  await pool.query(
+    `UPDATE ipam.scan_history SET status = 'running', total_ips = $1 WHERE id = $2`,
+    [totalIps, scanId],
+  );
+
+  // Check if nmap is available
+  try {
+    await execAsync("nmap --version", { timeout: 5000 });
+  } catch {
+    throw new Error("nmap is not installed or not in PATH");
+  }
+
+  // Run nmap ping scan with XML output
+  const isWindows = os.platform() === "win32";
+  const cmd = `nmap -sn -PE -PA80,443 -oX - ${cidr}`;
+
+  logger.info({ scanId, cmd }, "Executing nmap command");
+
+  const { stdout } = await execAsync(cmd, { timeout: 300000 }); // 5 minute timeout
+
+  // Parse nmap XML output
+  const activeIps: string[] = [];
+  const hostRegex = /<host[^>]*>[\s\S]*?<\/host>/g;
+  const ipRegex = /<address addr="([^"]+)" addrtype="ipv4"/;
+  const statusRegex = /<status state="up"/;
+
+  let match;
+  while ((match = hostRegex.exec(stdout)) !== null) {
+    const hostXml = match[0];
+    if (statusRegex.test(hostXml)) {
+      const ipMatch = ipRegex.exec(hostXml);
+      if (ipMatch) {
+        activeIps.push(ipMatch[1]);
+      }
+    }
+  }
+
+  let newCount = 0;
+
+  // Save discovered IPs to database
+  for (const ip of activeIps) {
+    const existingResult = await pool.query(
+      `SELECT id FROM ipam.addresses WHERE network_id = $1 AND address = $2`,
+      [networkId, ip],
+    );
+
+    if (existingResult.rows.length === 0) {
+      newCount++;
+      await pool.query(
+        `INSERT INTO ipam.addresses (network_id, address, status, last_seen)
+         VALUES ($1, $2, 'active', NOW())
+         ON CONFLICT (network_id, address) DO UPDATE
+         SET status = 'active', last_seen = NOW()`,
+        [networkId, ip],
+      );
+    } else {
+      await pool.query(
+        `UPDATE ipam.addresses SET status = 'active', last_seen = NOW()
+         WHERE network_id = $1 AND address = $2`,
+        [networkId, ip],
+      );
+    }
+  }
+
+  logger.info(
+    { scanId, activeCount: activeIps.length, newCount },
+    "nmap scan completed",
+  );
+
+  return { total: totalIps, active: activeIps.length, newIps: newCount };
+}
 
 // Zod schemas
 const networkSchema = z.object({
@@ -493,8 +852,84 @@ const ipamRoutes: FastifyPluginAsync = async (fastify) => {
       );
 
       const scan = scanResult.rows[0];
+      const network = networkResult.rows[0];
 
       logger.info({ networkId: id, scanId: scan.id, scanType }, "Scan started");
+
+      // Run scan in background (don't await - return immediately)
+      // Execute scan asynchronously - use setImmediate to ensure it runs on next tick
+      setImmediate(async () => {
+        logger.info(
+          { scanId: scan.id, scanType, networkCidr: network.network },
+          "Background scan starting",
+        );
+        try {
+          let result: { total: number; active: number; newIps: number };
+
+          switch (scanType) {
+            case "ping":
+              result = await runPingScan(network.network, scan.id, id, 20);
+              break;
+            case "tcp":
+              result = await runTcpScan(network.network, scan.id, id, 20);
+              break;
+            case "nmap":
+              result = await runNmapScan(network.network, scan.id, id);
+              break;
+            default:
+              // Default to ping scan
+              result = await runPingScan(network.network, scan.id, id, 20);
+          }
+
+          // Update scan as completed
+          await pool.query(
+            `UPDATE ipam.scan_history
+             SET status = 'completed',
+                 completed_at = NOW(),
+                 total_ips = $1,
+                 active_ips = $2,
+                 new_ips = $3
+             WHERE id = $4`,
+            [result.total, result.active, result.newIps, scan.id],
+          );
+
+          logger.info(
+            {
+              scanId: scan.id,
+              scanType,
+              totalIps: result.total,
+              activeIps: result.active,
+              newIps: result.newIps,
+            },
+            "Scan completed",
+          );
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          const errorStack = err instanceof Error ? err.stack : undefined;
+          logger.error(
+            {
+              scanId: scan.id,
+              scanType,
+              error: errorMessage,
+              stack: errorStack,
+            },
+            "Scan failed",
+          );
+          try {
+            await pool.query(
+              `UPDATE ipam.scan_history
+               SET status = 'failed', completed_at = NOW(), error_message = $1
+               WHERE id = $2`,
+              [errorMessage, scan.id],
+            );
+          } catch (dbErr) {
+            logger.error(
+              { scanId: scan.id, dbError: dbErr },
+              "Failed to update scan status after error",
+            );
+          }
+        }
+      });
 
       return {
         success: true,
@@ -502,7 +937,7 @@ const ipamRoutes: FastifyPluginAsync = async (fastify) => {
           id: scan.id,
           networkId: scan.network_id,
           scanType: scan.scan_type,
-          status: scan.status,
+          status: "running",
           startedAt: scan.started_at,
         },
         message: "Scan started",
