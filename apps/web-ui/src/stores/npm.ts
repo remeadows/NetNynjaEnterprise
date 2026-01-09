@@ -106,6 +106,56 @@ export interface AddHostsInput {
   pollInterval?: number;
 }
 
+// Poll device types
+export interface PollDeviceInput {
+  methods: ("icmp" | "snmp")[];
+}
+
+export interface PollResult {
+  icmp?: {
+    success: boolean;
+    latencyMs?: number;
+    error?: string;
+  };
+  snmp?: {
+    success: boolean;
+    cpuPercent?: number;
+    memoryPercent?: number;
+    uptimeSeconds?: number;
+    error?: string;
+  };
+}
+
+export interface PollDeviceResponse {
+  deviceId: string;
+  deviceName: string;
+  ipAddress: string;
+  polledAt: string;
+  methods: ("icmp" | "snmp")[];
+  results: PollResult;
+  deviceStatus: {
+    status: string;
+    icmpStatus: string;
+    snmpStatus: string;
+    lastPoll: string;
+    lastIcmpPoll: string | null;
+    lastSnmpPoll: string | null;
+  };
+}
+
+// Background poller status
+export interface PollerStatus {
+  isRunning: boolean;
+  activePolls: number;
+  pollCycleCount: number;
+  config: {
+    enabled: boolean;
+    defaultIntervalMs: number;
+    maxConcurrentPolls: number;
+    batchSize: number;
+  };
+}
+
 // Device metrics types
 export interface DeviceMetricsPoint {
   timestamp: string;
@@ -194,6 +244,8 @@ interface NPMState {
   // Metrics state
   currentMetrics: DeviceMetricsResponse | null;
   metricsHistory: DeviceMetricsHistoryResponse | null;
+  // Poller state
+  pollerStatus: PollerStatus | null;
   isLoading: boolean;
   error: string | null;
 
@@ -229,6 +281,13 @@ interface NPMState {
     startTime?: Date,
     endTime?: Date,
   ) => Promise<void>;
+  // Poll device action
+  pollDevice: (
+    deviceId: string,
+    methods: ("icmp" | "snmp")[],
+  ) => Promise<PollDeviceResponse>;
+  // Poller status actions
+  fetchPollerStatus: () => Promise<void>;
 }
 
 export const useNPMStore = create<NPMState>((set) => ({
@@ -242,6 +301,7 @@ export const useNPMStore = create<NPMState>((set) => ({
   jobSites: [],
   currentMetrics: null,
   metricsHistory: null,
+  pollerStatus: null,
   isLoading: false,
   error: null,
 
@@ -590,6 +650,68 @@ export const useNPMStore = create<NPMState>((set) => ({
       const message =
         err instanceof Error ? err.message : "Failed to fetch metrics history";
       set({ error: message, isLoading: false });
+    }
+  },
+
+  // Poll device now
+  pollDevice: async (deviceId: string, methods: ("icmp" | "snmp")[]) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.post<{ data: PollDeviceResponse }>(
+        `/api/v1/npm/devices/${deviceId}/poll`,
+        { methods },
+      );
+      const pollResult = response.data.data;
+
+      // Update device status in state
+      set((state) => ({
+        devices: state.devices.map((d) =>
+          d.id === deviceId
+            ? {
+                ...d,
+                status: pollResult.deviceStatus.status as
+                  | "up"
+                  | "down"
+                  | "warning"
+                  | "unknown",
+                lastPoll: new Date(pollResult.deviceStatus.lastPoll),
+              }
+            : d,
+        ),
+        selectedDevice:
+          state.selectedDevice?.id === deviceId
+            ? {
+                ...state.selectedDevice,
+                status: pollResult.deviceStatus.status as
+                  | "up"
+                  | "down"
+                  | "warning"
+                  | "unknown",
+                lastPoll: new Date(pollResult.deviceStatus.lastPoll),
+              }
+            : state.selectedDevice,
+        isLoading: false,
+      }));
+
+      return pollResult;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to poll device";
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  // Fetch background poller status
+  fetchPollerStatus: async () => {
+    try {
+      const response = await api.get<{ data: PollerStatus }>(
+        "/api/v1/npm/poller/status",
+      );
+      set({ pollerStatus: response.data.data });
+    } catch (err) {
+      // Silently fail - poller status is non-critical
+      console.warn("Failed to fetch poller status:", err);
     }
   },
 }));

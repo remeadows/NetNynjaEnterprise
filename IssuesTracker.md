@@ -3,8 +3,8 @@
 > Active issues and technical debt tracking
 
 **Version**: 0.1.0
-**Last Updated**: 2026-01-08 15:10 EST
-**Open Issues**: 0 | **Resolved Issues**: 64
+**Last Updated**: 2026-01-09 13:30 EST
+**Open Issues**: 2 | **Resolved Issues**: 66
 
 ## Issue Categories
 
@@ -153,6 +153,15 @@
 | ---- | -------- | ----------------------------------------------------- | -------- | -------- |
 | #101 | 🔴       | IPAM TCP/NMAP scans stuck at pending status (Windows) | -        | Resolved |
 
+### NPM Module (New Issues)
+
+| ID   | Priority | Title                                                               | Assignee | Status   |
+| ---- | -------- | ------------------------------------------------------------------- | -------- | -------- |
+| #102 | 🟠       | NPM - Poll Now button needed with Ping/SNMPv3 method selection      | -        | Resolved |
+| #103 | 🔴       | NPM - Continuous background polling needed (default 5 min interval) | -        | Resolved |
+| #104 | 🔴       | NPM - Poll Now fails with PostgreSQL parameter type error           | -        | Open     |
+| #105 | 🟠       | NPM - Need intuitive way to enable SNMPv3 in Device Properties      | -        | Open     |
+
 ---
 
 ## Resolved Issues
@@ -219,6 +228,8 @@
 | #053 | 🟡       | Windows: Docker credential helper not in PATH                | 2026-01-08    | `docker-credential-desktop` executable not found causes pulls to fail. Fix: Remove `"credsStore": "desktop"` line from `%USERPROFILE%\.docker\config.json` to use default file-based credential storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | #054 | 🟢       | Windows: .env requires manual password setup                 | 2026-01-08    | Docker Compose requires REDIS_PASSWORD and GRAFANA_PASSWORD to be set. Fix: Copy .env.example to .env and set `REDIS_PASSWORD=dev-redis-password` and `GRAFANA_PASSWORD=dev-grafana-password`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | #101 | 🔴       | IPAM TCP/NMAP scans stuck at pending status (Windows)        | 2026-01-08    | Background scan execution using async IIFE was not reliably starting on Windows. Root cause: async function wrapped in IIFE `(async () => { ... })()` was not keeping the event loop alive after HTTP response returned. Fix: Changed to `setImmediate(async () => { ... })` to ensure scan runs on next event loop tick; Added `net` module import at top level (was using `require` inside function); Improved TCP connect with double-resolution protection and timeout event handler; Added comprehensive error logging with stack traces; Wrapped database error updates in try-catch to prevent silent failures. Files modified: `apps/gateway/src/routes/ipam/index.ts`.                                                                                                                                                                                                                                                                                                                                                |
+| #102 | 🟠       | NPM - Poll Now button with Ping/SNMPv3 method selection      | 2026-01-09    | Created complete Poll Now functionality: Backend POST /api/v1/npm/devices/:id/poll endpoint with method selection (icmp, snmp); Validates device capabilities and credentials; ICMP polling via child_process ping with latency parsing; Updates device status and inserts metrics record; Frontend DevicesPage.tsx with Poll button in table actions column and Poll Now modal; DeviceDetailPage.tsx with Poll Now button in header; Poll modal includes method checkboxes (disabled if not enabled on device), poll results display (latency, status), and Poll Again option; npm.ts store updated with pollDevice action and PollDeviceResponse type.                                                                                                                                                                                                                                                                                                                                                                       |
+| #103 | 🔴       | NPM - Continuous background polling (5 min default)          | 2026-01-09    | Created complete background polling service: apps/gateway/src/plugins/background-poller.ts with BackgroundPoller class; Configurable via env vars NPM_POLLER_ENABLED, NPM_POLL_INTERVAL_MS (default 5 min), NPM_MAX_CONCURRENT_POLLS (50), NPM_POLL_BATCH_SIZE (100); Polls active devices where last_poll + poll_interval < NOW(); ICMP ping with latency parsing and status update; Inserts metrics records; API endpoints: GET /api/v1/npm/poller/status, POST /start, POST /stop (admin only); Frontend DevicesPage.tsx shows "Auto-Polling" indicator with green pulse when running, poll interval displayed, hover shows cycle count and active polls; npm.ts store updated with pollerStatus state and fetchPollerStatus action; Poller starts automatically on gateway startup if enabled.                                                                                                                                                                                                                             |
 
 ---
 

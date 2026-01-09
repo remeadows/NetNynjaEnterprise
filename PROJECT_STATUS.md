@@ -1,10 +1,10 @@
 # NetNynja Enterprise - Project Status
 
 **Version**: 0.2.0
-**Last Updated**: 2026-01-08 15:10 EST
+**Last Updated**: 2026-01-09 13:30 EST
 **Current Phase**: Phase 8 - Cross-Platform Testing (In Progress)
 **Overall Progress**: ▓▓▓▓▓▓▓▓▓▓ 95%
-**Issues**: 0 Open | 64 Resolved
+**Issues**: 2 Open | 66 Resolved
 
 ---
 
@@ -342,6 +342,10 @@ NetNynja Enterprise consolidates three network management applications (IPAM, NP
 | `/api/v1/npm/volumes/:id/metrics`            | GET              | Volume metrics history          |
 | `/api/v1/npm/dashboard`                      | GET              | Optimized dashboard stats       |
 | `/api/v1/npm/devices/status`                 | GET              | Lightweight bulk status         |
+| `/api/v1/npm/devices/:id/poll`               | POST             | On-demand device polling        |
+| `/api/v1/npm/poller/status`                  | GET              | Background poller status        |
+| `/api/v1/npm/poller/start`                   | POST             | Start background poller (admin) |
+| `/api/v1/npm/poller/stop`                    | POST             | Stop background poller (admin)  |
 
 ### SNMPv3 Credential Management
 
@@ -853,6 +857,19 @@ NetNynja Enterprise consolidates three network management applications (IPAM, NP
 - Interface and volume metrics with history
 - Health/status PDF and CSV export
 - Scaled for 3000+ devices with optimized queries
+
+#### NPM Poll Now & Background Polling (2026-01-09)
+
+- Poll Now button with Ping/SNMPv3 method selection (#102)
+- On-demand device polling via POST /api/v1/npm/devices/:id/poll
+- ICMP ping with latency parsing and status update
+- Poll results modal showing success/failure and latency
+- Background poller plugin for continuous monitoring (#103)
+- Configurable polling interval (default 5 minutes)
+- Max concurrent polls (50), batch size (100)
+- Auto-Polling status indicator on Devices page
+- Poller control endpoints (start/stop/status)
+- Known issue: PostgreSQL parameter type error on metrics insert (#104)
 
 #### Development Infrastructure Improvements
 

@@ -25,6 +25,7 @@ import ipamRoutes from "./routes/ipam";
 import npmRoutes from "./routes/npm";
 import stigRoutes from "./routes/stig";
 import syslogRoutes from "./routes/syslog";
+import backgroundPollerPlugin from "./plugins/background-poller";
 
 // Initialize OpenTelemetry before anything else
 initTelemetry();
@@ -92,6 +93,9 @@ async function start(): Promise<void> {
     await fastify.register(npmRoutes, { prefix: "/api/v1/npm" });
     await fastify.register(stigRoutes, { prefix: "/api/v1/stig" });
     await fastify.register(syslogRoutes, { prefix: "/api/v1/syslog" });
+
+    // Register background poller for NPM continuous monitoring
+    await fastify.register(backgroundPollerPlugin);
 
     // Connect to Redis
     await redis.connect();

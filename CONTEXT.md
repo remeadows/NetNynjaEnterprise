@@ -3,8 +3,8 @@
 > Comprehensive context for AI-assisted and human development
 
 **Version**: 0.2.0
-**Last Updated**: 2026-01-08 11:00 EST
-**Status**: Active Development - Phase 8 In Progress (All 60 Issues Resolved)
+**Last Updated**: 2026-01-09 13:30 EST
+**Status**: Active Development - Phase 8 In Progress (2 Open, 66 Resolved)
 
 ## Project Vision
 
@@ -163,6 +163,8 @@ The monorepo is organized for separation of concerns while enabling code sharing
 - Health/status PDF/CSV export
 - Site-based grouping of discovered hosts
 - Scale to 3000+ devices with optimized queries
+- On-demand device polling (Poll Now) with method selection
+- Continuous background polling (5-minute default interval)
 
 ### STIG Domain
 
