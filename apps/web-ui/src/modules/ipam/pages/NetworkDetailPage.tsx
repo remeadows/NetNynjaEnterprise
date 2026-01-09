@@ -219,10 +219,10 @@ export function IPAMNetworkDetailPage() {
   };
 
   // Get selected address IDs
-  const selectedAddressIds = Object.keys(rowSelection)
-    .filter((key) => rowSelection[key])
-    .map((index) => addresses[parseInt(index, 10)]?.id)
-    .filter((id): id is string => !!id);
+  // With getRowId={(row) => row.id}, the rowSelection keys are the actual address IDs
+  const selectedAddressIds = Object.keys(rowSelection).filter(
+    (key) => rowSelection[key],
+  );
 
   const handleAddToNpm = useCallback(async () => {
     if (selectedAddressIds.length === 0) return;
@@ -562,6 +562,7 @@ export function IPAMNetworkDetailPage() {
             emptyMessage="No IP addresses discovered yet. Run a network scan to discover devices."
             rowSelection={rowSelection}
             onRowSelectionChange={setRowSelection}
+            getRowId={(row) => row.id}
           />
         </CardContent>
       </Card>

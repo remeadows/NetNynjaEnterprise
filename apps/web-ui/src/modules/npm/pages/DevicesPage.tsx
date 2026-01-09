@@ -194,10 +194,10 @@ export function NPMDevicesPage() {
         : (devices as DeviceWithGroup[]);
 
   // Get selected device IDs
-  const selectedDeviceIds = Object.keys(rowSelection)
-    .filter((key) => rowSelection[key])
-    .map((index) => filteredDevices[parseInt(index)]?.id)
-    .filter(Boolean) as string[];
+  // With getRowId={(row) => row.id}, the rowSelection keys are the actual device IDs
+  const selectedDeviceIds = Object.keys(rowSelection).filter(
+    (key) => rowSelection[key],
+  );
 
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -460,6 +460,7 @@ export function NPMDevicesPage() {
             emptyMessage="No devices found. Add your first device to start monitoring."
             rowSelection={rowSelection}
             onRowSelectionChange={setRowSelection}
+            getRowId={(row) => row.id}
           />
         </CardContent>
       </Card>
