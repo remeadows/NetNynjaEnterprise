@@ -81,6 +81,7 @@ export function DataTable<TData>({
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
     onRowSelectionChange: handleRowSelectionChange,
+    enableRowSelection: true,
     getRowId,
     state: {
       sorting,
