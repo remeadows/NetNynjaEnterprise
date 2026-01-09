@@ -64,12 +64,14 @@ npm run dev
 
 | Service         | URL                    | Credentials         |
 | --------------- | ---------------------- | ------------------- |
-| Web UI          | http://localhost:5173  | admin / (from .env) |
+| Web UI          | http://localhost:3000  | admin / (from .env) |
 | API Gateway     | http://localhost:3001  | -                   |
-| Grafana         | http://localhost:3000  | admin / (from .env) |
+| Grafana         | http://localhost:3002  | admin / (from .env) |
 | NATS Monitoring | http://localhost:8222  | -                   |
 | Jaeger Tracing  | http://localhost:16686 | -                   |
 | Vault           | http://localhost:8200  | (dev token)         |
+
+> **Note**: See [DOCKER_STRUCTURE.md](DOCKER_STRUCTURE.md) for complete container architecture and port allocation.
 
 ## Architecture
 

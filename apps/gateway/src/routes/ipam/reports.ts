@@ -6,24 +6,15 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { pool } from "../../db";
-import PdfPrinter from "pdfmake";
 import type {
   TDocumentDefinitions,
   Content,
   TableCell,
 } from "pdfmake/interfaces";
 
-// PDF fonts configuration
-const fonts = {
-  Helvetica: {
-    normal: "Helvetica",
-    bold: "Helvetica-Bold",
-    italics: "Helvetica-Oblique",
-    bolditalics: "Helvetica-BoldOblique",
-  },
-};
-
-const printer = new PdfPrinter(fonts);
+// Use require for pdfmake (it exports a singleton for Node.js)
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const pdfMake = require("pdfmake");
 
 // Query schema for report parameters
 const scanReportQuerySchema = z.object({
@@ -470,24 +461,18 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
         ],
       };
 
-      const pdfDoc = printer.createPdfKitDocument(docDefinition);
-
-      // Collect PDF chunks
-      const chunks: Buffer[] = [];
-      pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
-
       return new Promise((resolve, reject) => {
-        pdfDoc.on("end", () => {
-          const pdfBuffer = Buffer.concat(chunks);
-          reply.header("Content-Type", "application/pdf");
-          reply.header(
-            "Content-Disposition",
-            `attachment; filename="ipam-scan-report-${scan.network_name.replace(/[^a-zA-Z0-9]/g, "-")}-${now.toISOString().split("T")[0]}.pdf"`,
-          );
-          resolve(reply.send(pdfBuffer));
-        });
-        pdfDoc.on("error", reject);
-        pdfDoc.end();
+        pdfMake.createPdf(docDefinition).getBuffer(
+          (buffer: Buffer) => {
+            reply.header("Content-Type", "application/pdf");
+            reply.header(
+              "Content-Disposition",
+              `attachment; filename="ipam-scan-report-${scan.network_name.replace(/[^a-zA-Z0-9]/g, "-")}-${now.toISOString().split("T")[0]}.pdf"`,
+            );
+            resolve(reply.send(buffer));
+          },
+          (err: Error) => reject(err),
+        );
       });
     },
   );
@@ -876,23 +861,18 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
         ],
       };
 
-      const pdfDoc = printer.createPdfKitDocument(docDefinition);
-
-      const chunks: Buffer[] = [];
-      pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
-
       return new Promise((resolve, reject) => {
-        pdfDoc.on("end", () => {
-          const pdfBuffer = Buffer.concat(chunks);
-          reply.header("Content-Type", "application/pdf");
-          reply.header(
-            "Content-Disposition",
-            `attachment; filename="ipam-network-${network.name.replace(/[^a-zA-Z0-9]/g, "-")}-${now.toISOString().split("T")[0]}.pdf"`,
-          );
-          resolve(reply.send(pdfBuffer));
-        });
-        pdfDoc.on("error", reject);
-        pdfDoc.end();
+        pdfMake.createPdf(docDefinition).getBuffer(
+          (buffer: Buffer) => {
+            reply.header("Content-Type", "application/pdf");
+            reply.header(
+              "Content-Disposition",
+              `attachment; filename="ipam-network-${network.name.replace(/[^a-zA-Z0-9]/g, "-")}-${now.toISOString().split("T")[0]}.pdf"`,
+            );
+            resolve(reply.send(buffer));
+          },
+          (err: Error) => reject(err),
+        );
       });
     },
   );
