@@ -26,6 +26,10 @@ export interface DataTableProps<TData> {
   emptyMessage?: string;
   rowSelection?: RowSelectionState;
   onRowSelectionChange?: OnChangeFn<RowSelectionState>;
+  /** Function to get a unique ID for each row. When provided, row selection
+   * uses these IDs instead of row indices, which fixes selection issues
+   * when the table is filtered, sorted, or paginated. */
+  getRowId?: (originalRow: TData, index: number) => string;
 }
 
 export function DataTable<TData>({
@@ -39,6 +43,7 @@ export function DataTable<TData>({
   emptyMessage = "No data available",
   rowSelection,
   onRowSelectionChange,
+  getRowId,
 }: DataTableProps<TData>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -76,6 +81,8 @@ export function DataTable<TData>({
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
     onRowSelectionChange: handleRowSelectionChange,
+    enableRowSelection: true,
+    getRowId,
     state: {
       sorting,
       columnFilters,

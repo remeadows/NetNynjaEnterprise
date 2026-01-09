@@ -484,7 +484,7 @@ NetNynja Enterprise consolidates three network management applications (IPAM, NP
 | macOS (ARM64)  | ✅     | ✅      | ✅      | ✅    | Complete (28/28 pass)  |
 | macOS (x64)    | ⬜     | ⬜      | ⬜      | ⬜    | Deferred (needs Intel) |
 | RHEL 9.x       | ✅     | ✅      | ✅      | ✅    | Validated (12/12 pass) |
-| Windows 11     | ✅     | ✅      | ✅      | ✅    | Complete (19/21 pass)  |
+| Windows 11     | ⬜     | ⬜      | ⬜      | ⬜    | Script Ready           |
 | Windows Server | ⬜     | ⬜      | ⬜      | ⬜    | Script Ready           |
 
 ### macOS ARM64 Test Results (2026-01-07)
@@ -556,37 +556,7 @@ NetNynja Enterprise consolidates three network management applications (IPAM, NP
 - Consider Podman as Docker alternative (rootless by default)
 - Open firewalld ports: 3000-3006, 4222, 5433, 6379, 8200, 8222, 8428, 9090, 3100, 16686
 
-### Windows 11 Test Results (2026-01-08)
-
-**Environment:**
-
-- Windows 11 Pro (Build 26200)
-- Docker Desktop 29.1.3 / Compose 2.40.3
-- WSL2 with Ubuntu default distro
-
-**Test Summary:** 19 tests passed, 0 failed, 2 skipped, 90% pass rate
-
-| Category         | Tests | Status     |
-| ---------------- | ----- | ---------- |
-| Prerequisites    | 10    | ✅         |
-| Infrastructure   | 11    | ✅         |
-| Windows-Specific | 2     | ⏭️ Skipped |
-
-**Windows-Specific Issues Found:**
-
-| Issue   | Severity | Description                          | Resolution                                                 |
-| ------- | -------- | ------------------------------------ | ---------------------------------------------------------- |
-| WIN-001 | Low      | Docker not in PATH by default        | Use full path or add Docker bin directory to PATH          |
-| WIN-002 | Medium   | Docker credential helper not in PATH | Remove credsStore from ~/.docker/config.json               |
-| WIN-003 | Low      | .env requires manual setup           | Copy .env.example and set REDIS_PASSWORD, GRAFANA_PASSWORD |
-
-**Windows Recommendations:**
-
-- Add `C:\Program Files\Docker\Docker\resources\bin` to system PATH
-- Enable long path support (already enabled on test machine)
-- If credential helper errors occur, remove `credsStore` from `~/.docker/config.json`
-
-### Windows Test Scripts
+### Windows Test Scripts (Ready for Execution)
 
 **Scripts Created:**
 
@@ -599,7 +569,7 @@ NetNynja Enterprise consolidates three network management applications (IPAM, NP
 - [x] macOS ARM64 smoke tests pass (28/28)
 - [ ] macOS x64 smoke tests (deferred - requires Intel Mac)
 - [x] RHEL 9.x smoke tests (validated via container)
-- [x] Windows 11 smoke tests (19/21 pass, 2 skipped)
+- [ ] Windows 11 smoke tests (script ready)
 - [ ] Windows Server smoke tests (script ready)
 - [x] Platform-specific documentation (tests/smoke/)
 - [x] Known issues documented
@@ -677,6 +647,15 @@ NetNynja Enterprise consolidates three network management applications (IPAM, NP
 
 ### [Unreleased]
 
+#### Session 2026-01-09: Bug Fixes and Documentation
+
+- Fixed structlog `add_logger_name` incompatibility with `PrintLoggerFactory` in IPAM and NPM logging configs
+- Fixed Python 3.11 type hint issue in STIG repository (`from __future__ import annotations`)
+- Fixed pdfmake import for Node.js server-side usage in IPAM and NPM report routes
+- Downgraded `@fastify/multipart` from v9 to v8 for Fastify 4.x compatibility
+- Created comprehensive Docker Compose structure documentation (`DOCKER_STRUCTURE.md`)
+- All core services verified running: Gateway, Auth, Web UI, IPAM, NPM, STIG
+
 #### Phase 8: Cross-Platform Testing (In Progress)
 
 - macOS ARM64 smoke tests: 28/28 passed (100%)
@@ -687,16 +666,6 @@ NetNynja Enterprise consolidates three network management applications (IPAM, NP
 - Standardized port allocation across all services (3000-3006)
 - Created comprehensive smoke test scripts for all platforms
 - Test result files in JSON format (tests/smoke/results/)
-
-#### IPAM Scan Execution Fix (2026-01-08)
-
-- Fixed TCP and NMAP scans stuck at "pending" status on Windows
-- Root cause: async IIFE `(async () => { ... })()` not keeping event loop alive
-- Changed to `setImmediate(async () => { ... })` for reliable background execution
-- Moved `net` module import to top level (was using require inside function)
-- Improved TCP connect with double-resolution protection and timeout handler
-- Added comprehensive error logging with stack traces
-- Wrapped database error updates in try-catch to prevent silent failures
 
 #### NPM Module: SNMPv3 Credentials Management (2026-01-07)
 

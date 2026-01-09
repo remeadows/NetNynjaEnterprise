@@ -67,9 +67,6 @@
 | ---- | -------- | ------------------------------------------------ | -------- | -------- |
 | #050 | 🟡       | Port conflict: Grafana 3000 vs Vite dev server   | -        | Resolved |
 | #051 | 🟡       | Port conflict: Auth service 3002 vs Grafana 3002 | -        | Resolved |
-| #052 | 🟢       | Windows: Docker not in PATH by default           | -        | Resolved |
-| #053 | 🟡       | Windows: Docker credential helper not in PATH    | -        | Resolved |
-| #054 | 🟢       | Windows: .env requires manual password setup     | -        | Resolved |
 
 ### IPAM Module
 

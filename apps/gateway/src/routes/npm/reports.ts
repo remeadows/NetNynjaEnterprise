@@ -572,17 +572,17 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
       pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
 
       return new Promise((resolve, reject) => {
-        pdfDoc.on("end", () => {
-          const pdfBuffer = Buffer.concat(chunks);
-          reply.header("Content-Type", "application/pdf");
-          reply.header(
-            "Content-Disposition",
-            `attachment; filename="npm-health-report-${now.toISOString().split("T")[0]}.pdf"`,
-          );
-          resolve(reply.send(pdfBuffer));
-        });
-        pdfDoc.on("error", reject);
-        pdfDoc.end();
+        pdfMake.createPdf(docDefinition).getBuffer(
+          (buffer: Buffer) => {
+            reply.header("Content-Type", "application/pdf");
+            reply.header(
+              "Content-Disposition",
+              `attachment; filename="npm-health-report-${now.toISOString().split("T")[0]}.pdf"`,
+            );
+            resolve(reply.send(buffer));
+          },
+          (err: Error) => reject(err),
+        );
       });
     },
   );
@@ -1015,17 +1015,17 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
       pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
 
       return new Promise((resolve, reject) => {
-        pdfDoc.on("end", () => {
-          const pdfBuffer = Buffer.concat(chunks);
-          reply.header("Content-Type", "application/pdf");
-          reply.header(
-            "Content-Disposition",
-            `attachment; filename="device-report-${device.name.replace(/[^a-zA-Z0-9]/g, "-")}-${now.toISOString().split("T")[0]}.pdf"`,
-          );
-          resolve(reply.send(pdfBuffer));
-        });
-        pdfDoc.on("error", reject);
-        pdfDoc.end();
+        pdfMake.createPdf(docDefinition).getBuffer(
+          (buffer: Buffer) => {
+            reply.header("Content-Type", "application/pdf");
+            reply.header(
+              "Content-Disposition",
+              `attachment; filename="device-report-${device.name.replace(/[^a-zA-Z0-9]/g, "-")}-${now.toISOString().split("T")[0]}.pdf"`,
+            );
+            resolve(reply.send(buffer));
+          },
+          (err: Error) => reject(err),
+        );
       });
     },
   );
