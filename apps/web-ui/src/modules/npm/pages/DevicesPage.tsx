@@ -12,7 +12,7 @@ import {
 } from "@netnynja/shared-ui";
 import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
 import type { Device } from "@netnynja/shared-types";
-import { useNPMStore } from "../../../stores/npm";
+import { useNPMStore, type PollDeviceResponse } from "../../../stores/npm";
 import { useSNMPv3CredentialsStore } from "../../../stores/snmpv3-credentials";
 import { useDeviceGroupsStore } from "../../../stores/device-groups";
 
@@ -30,7 +30,10 @@ interface DeviceWithGroup extends Device {
   groupColor?: string | null;
 }
 
-const getColumns = (showGroupColumn: boolean): ColumnDef<DeviceWithGroup>[] => {
+const getColumns = (
+  showGroupColumn: boolean,
+  onPollClick: (device: DeviceWithGroup, e: React.MouseEvent) => void,
+): ColumnDef<DeviceWithGroup>[] => {
   const baseColumns: ColumnDef<DeviceWithGroup>[] = [
     {
       id: "select",
@@ -137,6 +140,32 @@ const getColumns = (showGroupColumn: boolean): ColumnDef<DeviceWithGroup>[] => {
           ? new Date(row.original.lastPoll).toLocaleString()
           : "Never",
     },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => (
+        <button
+          onClick={(e) => onPollClick(row.original, e)}
+          className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors"
+          title="Poll Now"
+        >
+          <svg
+            className="h-3.5 w-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+          Poll
+        </button>
+      ),
+    },
   );
 
   return baseColumns;
@@ -144,7 +173,15 @@ const getColumns = (showGroupColumn: boolean): ColumnDef<DeviceWithGroup>[] => {
 
 export function NPMDevicesPage() {
   const navigate = useNavigate();
-  const { devices, isLoading, fetchDevices, createDevice } = useNPMStore();
+  const {
+    devices,
+    isLoading,
+    fetchDevices,
+    createDevice,
+    pollDevice,
+    pollerStatus,
+    fetchPollerStatus,
+  } = useNPMStore();
   const { credentials, fetchCredentials } = useSNMPv3CredentialsStore();
   const {
     groups,
@@ -156,6 +193,15 @@ export function NPMDevicesPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [pollTargetDevice, setPollTargetDevice] =
+    useState<DeviceWithGroup | null>(null);
+  const [pollMethods, setPollMethods] = useState<{
+    icmp: boolean;
+    snmp: boolean;
+  }>({ icmp: true, snmp: false });
+  const [pollResult, setPollResult] = useState<PollDeviceResponse | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>("");
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [newGroup, setNewGroup] = useState({
@@ -181,7 +227,11 @@ export function NPMDevicesPage() {
     fetchDevices();
     fetchCredentials();
     fetchGroups();
-  }, [fetchDevices, fetchCredentials, fetchGroups]);
+    fetchPollerStatus();
+    // Refresh poller status every 30 seconds
+    const pollerInterval = setInterval(fetchPollerStatus, 30000);
+    return () => clearInterval(pollerInterval);
+  }, [fetchDevices, fetchCredentials, fetchGroups, fetchPollerStatus]);
 
   // Filter devices by group
   const filteredDevices =
@@ -246,6 +296,46 @@ export function NPMDevicesPage() {
     }
   };
 
+  const openPollModal = (device: DeviceWithGroup, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setPollTargetDevice(device);
+    setPollMethods({
+      icmp: device.pollIcmp ?? true,
+      snmp: device.pollSnmp ?? false,
+    });
+    setPollResult(null);
+    setShowPollModal(true);
+  };
+
+  const handlePollDevice = async () => {
+    if (!pollTargetDevice) return;
+    const methods: ("icmp" | "snmp")[] = [];
+    if (pollMethods.icmp) methods.push("icmp");
+    if (pollMethods.snmp) methods.push("snmp");
+
+    if (methods.length === 0) return;
+
+    setIsPolling(true);
+    setPollResult(null);
+    try {
+      const result = await pollDevice(pollTargetDevice.id, methods);
+      setPollResult(result);
+    } catch {
+      // Error handled in store
+    } finally {
+      setIsPolling(false);
+    }
+  };
+
+  const closePollModal = () => {
+    setShowPollModal(false);
+    setPollTargetDevice(null);
+    setPollResult(null);
+    setPollMethods({ icmp: true, snmp: false });
+  };
+
   const handleAddDevice = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -302,17 +392,45 @@ export function NPMDevicesPage() {
 
   const columns = getColumns(
     !selectedGroupFilter || selectedGroupFilter === "ungrouped",
+    openPollModal,
   );
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Devices
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Devices
+            </h1>
+            {pollerStatus && (
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                  pollerStatus.isRunning
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                }`}
+                title={`Poll interval: ${Math.round(pollerStatus.config.defaultIntervalMs / 60000)} min | Cycles: ${pollerStatus.pollCycleCount} | Active: ${pollerStatus.activePolls}`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    pollerStatus.isRunning
+                      ? "bg-green-500 animate-pulse"
+                      : "bg-gray-400"
+                  }`}
+                />
+                {pollerStatus.isRunning ? "Auto-Polling" : "Poller Stopped"}
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 dark:text-gray-400">
             Monitor your network devices
+            {pollerStatus?.isRunning && (
+              <span className="text-xs ml-2">
+                (every{" "}
+                {Math.round(pollerStatus.config.defaultIntervalMs / 60000)} min)
+              </span>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
@@ -757,6 +875,202 @@ export function NPMDevicesPage() {
                 >
                   Assign to Group
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Poll Now Modal */}
+      {showPollModal && pollTargetDevice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-md">
+            <CardContent className="pt-6">
+              <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+                Poll Device Now
+              </h2>
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Device:{" "}
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {pollTargetDevice.name}
+                  </span>
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  IP:{" "}
+                  <code className="rounded bg-gray-100 px-2 py-0.5 text-sm dark:bg-gray-800">
+                    {pollTargetDevice.ipAddress}
+                  </code>
+                </p>
+              </div>
+
+              {/* Polling Method Selection */}
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Select Polling Methods
+                </p>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="pollIcmpNow"
+                      checked={pollMethods.icmp}
+                      onChange={(e) =>
+                        setPollMethods({
+                          ...pollMethods,
+                          icmp: e.target.checked,
+                        })
+                      }
+                      disabled={!pollTargetDevice.pollIcmp || isPolling}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                    />
+                    <label
+                      htmlFor="pollIcmpNow"
+                      className={`text-sm ${!pollTargetDevice.pollIcmp ? "text-gray-400" : "text-gray-700 dark:text-gray-300"}`}
+                    >
+                      Ping (ICMP)
+                      {!pollTargetDevice.pollIcmp && (
+                        <span className="ml-2 text-xs text-gray-400">
+                          (not enabled for this device)
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="pollSnmpNow"
+                      checked={pollMethods.snmp}
+                      onChange={(e) =>
+                        setPollMethods({
+                          ...pollMethods,
+                          snmp: e.target.checked,
+                        })
+                      }
+                      disabled={!pollTargetDevice.pollSnmp || isPolling}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                    />
+                    <label
+                      htmlFor="pollSnmpNow"
+                      className={`text-sm ${!pollTargetDevice.pollSnmp ? "text-gray-400" : "text-gray-700 dark:text-gray-300"}`}
+                    >
+                      SNMPv3
+                      {!pollTargetDevice.pollSnmp && (
+                        <span className="ml-2 text-xs text-gray-400">
+                          (not enabled for this device)
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                </div>
+                {!pollMethods.icmp && !pollMethods.snmp && (
+                  <p className="mt-2 text-xs text-red-600">
+                    Select at least one polling method
+                  </p>
+                )}
+              </div>
+
+              {/* Poll Results */}
+              {pollResult && (
+                <div className="mt-4 border-t pt-4">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Poll Results
+                  </p>
+                  <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 space-y-2">
+                    {pollResult.results.icmp && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          Ping:
+                        </span>
+                        {pollResult.results.icmp.success ? (
+                          <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                            Success (
+                            {pollResult.results.icmp.latencyMs?.toFixed(1)}ms)
+                          </span>
+                        ) : (
+                          <span className="text-sm text-red-600 dark:text-red-400 font-medium">
+                            Failed -{" "}
+                            {pollResult.results.icmp.error || "Unreachable"}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {pollResult.results.snmp && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          SNMPv3:
+                        </span>
+                        {pollResult.results.snmp.success ? (
+                          <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                            Poll queued
+                          </span>
+                        ) : (
+                          <span className="text-sm text-red-600 dark:text-red-400 font-medium">
+                            Failed - {pollResult.results.snmp.error || "Error"}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between pt-1 border-t border-gray-200 dark:border-gray-700">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        Device Status:
+                      </span>
+                      <StatusIndicator
+                        status={
+                          statusMap[
+                            pollResult.deviceStatus
+                              .status as keyof typeof statusMap
+                          ]
+                        }
+                        label={pollResult.deviceStatus.status.toUpperCase()}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closePollModal}
+                >
+                  {pollResult ? "Close" : "Cancel"}
+                </Button>
+                {!pollResult && (
+                  <Button
+                    onClick={handlePollDevice}
+                    loading={isPolling}
+                    disabled={!pollMethods.icmp && !pollMethods.snmp}
+                  >
+                    <svg
+                      className="mr-2 h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                    Poll Now
+                  </Button>
+                )}
+                {pollResult && (
+                  <Button
+                    onClick={() => {
+                      setPollResult(null);
+                      handlePollDevice();
+                    }}
+                    loading={isPolling}
+                    disabled={!pollMethods.icmp && !pollMethods.snmp}
+                  >
+                    Poll Again
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

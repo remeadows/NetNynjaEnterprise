@@ -10,7 +10,7 @@ import {
   StatusIndicator,
   LineChart,
 } from "@netnynja/shared-ui";
-import { useNPMStore } from "../../../stores/npm";
+import { useNPMStore, type PollDeviceResponse } from "../../../stores/npm";
 
 export function NPMDeviceDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,9 +24,17 @@ export function NPMDeviceDetailPage() {
     fetchCurrentMetrics,
     fetchMetricsHistory,
     deleteDevice,
+    pollDevice,
   } = useNPMStore();
 
   const [timeRange, setTimeRange] = useState<"1h" | "6h" | "24h" | "7d">("24h");
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [pollMethods, setPollMethods] = useState<{
+    icmp: boolean;
+    snmp: boolean;
+  }>({ icmp: true, snmp: false });
+  const [pollResult, setPollResult] = useState<PollDeviceResponse | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -63,6 +71,44 @@ export function NPMDeviceDetailPage() {
       await deleteDevice(id);
       navigate("/npm/devices");
     }
+  };
+
+  const openPollModal = () => {
+    if (selectedDevice) {
+      setPollMethods({
+        icmp: selectedDevice.pollIcmp ?? true,
+        snmp: selectedDevice.pollSnmp ?? false,
+      });
+      setPollResult(null);
+      setShowPollModal(true);
+    }
+  };
+
+  const handlePollDevice = async () => {
+    if (!id) return;
+    const methods: ("icmp" | "snmp")[] = [];
+    if (pollMethods.icmp) methods.push("icmp");
+    if (pollMethods.snmp) methods.push("snmp");
+
+    if (methods.length === 0) return;
+
+    setIsPolling(true);
+    setPollResult(null);
+    try {
+      const result = await pollDevice(id, methods);
+      setPollResult(result);
+      // Refresh metrics after poll
+      fetchCurrentMetrics(id);
+    } catch {
+      // Error handled in store
+    } finally {
+      setIsPolling(false);
+    }
+  };
+
+  const closePollModal = () => {
+    setShowPollModal(false);
+    setPollResult(null);
   };
 
   const statusMap = {
@@ -144,7 +190,7 @@ export function NPMDeviceDetailPage() {
           </div>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline">
+          <Button variant="outline" onClick={openPollModal}>
             <svg
               className="mr-2 h-4 w-4"
               fill="none"
@@ -467,6 +513,202 @@ export function NPMDeviceDetailPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Poll Now Modal */}
+      {showPollModal && selectedDevice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-md">
+            <CardContent className="pt-6">
+              <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+                Poll Device Now
+              </h2>
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Device:{" "}
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {selectedDevice.name}
+                  </span>
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  IP:{" "}
+                  <code className="rounded bg-gray-100 px-2 py-0.5 text-sm dark:bg-gray-800">
+                    {selectedDevice.ipAddress}
+                  </code>
+                </p>
+              </div>
+
+              {/* Polling Method Selection */}
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Select Polling Methods
+                </p>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="pollIcmpDetail"
+                      checked={pollMethods.icmp}
+                      onChange={(e) =>
+                        setPollMethods({
+                          ...pollMethods,
+                          icmp: e.target.checked,
+                        })
+                      }
+                      disabled={!selectedDevice.pollIcmp || isPolling}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                    />
+                    <label
+                      htmlFor="pollIcmpDetail"
+                      className={`text-sm ${!selectedDevice.pollIcmp ? "text-gray-400" : "text-gray-700 dark:text-gray-300"}`}
+                    >
+                      Ping (ICMP)
+                      {!selectedDevice.pollIcmp && (
+                        <span className="ml-2 text-xs text-gray-400">
+                          (not enabled)
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="pollSnmpDetail"
+                      checked={pollMethods.snmp}
+                      onChange={(e) =>
+                        setPollMethods({
+                          ...pollMethods,
+                          snmp: e.target.checked,
+                        })
+                      }
+                      disabled={!selectedDevice.pollSnmp || isPolling}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                    />
+                    <label
+                      htmlFor="pollSnmpDetail"
+                      className={`text-sm ${!selectedDevice.pollSnmp ? "text-gray-400" : "text-gray-700 dark:text-gray-300"}`}
+                    >
+                      SNMPv3
+                      {!selectedDevice.pollSnmp && (
+                        <span className="ml-2 text-xs text-gray-400">
+                          (not enabled)
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                </div>
+                {!pollMethods.icmp && !pollMethods.snmp && (
+                  <p className="mt-2 text-xs text-red-600">
+                    Select at least one polling method
+                  </p>
+                )}
+              </div>
+
+              {/* Poll Results */}
+              {pollResult && (
+                <div className="mt-4 border-t pt-4">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Poll Results
+                  </p>
+                  <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 space-y-2">
+                    {pollResult.results.icmp && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          Ping:
+                        </span>
+                        {pollResult.results.icmp.success ? (
+                          <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                            Success (
+                            {pollResult.results.icmp.latencyMs?.toFixed(1)}ms)
+                          </span>
+                        ) : (
+                          <span className="text-sm text-red-600 dark:text-red-400 font-medium">
+                            Failed -{" "}
+                            {pollResult.results.icmp.error || "Unreachable"}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {pollResult.results.snmp && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          SNMPv3:
+                        </span>
+                        {pollResult.results.snmp.success ? (
+                          <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                            Poll queued
+                          </span>
+                        ) : (
+                          <span className="text-sm text-red-600 dark:text-red-400 font-medium">
+                            Failed - {pollResult.results.snmp.error || "Error"}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between pt-1 border-t border-gray-200 dark:border-gray-700">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        Device Status:
+                      </span>
+                      <StatusIndicator
+                        status={
+                          statusMap[
+                            pollResult.deviceStatus
+                              .status as keyof typeof statusMap
+                          ]
+                        }
+                        label={pollResult.deviceStatus.status.toUpperCase()}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closePollModal}
+                >
+                  {pollResult ? "Close" : "Cancel"}
+                </Button>
+                {!pollResult && (
+                  <Button
+                    onClick={handlePollDevice}
+                    loading={isPolling}
+                    disabled={!pollMethods.icmp && !pollMethods.snmp}
+                  >
+                    <svg
+                      className="mr-2 h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                    Poll Now
+                  </Button>
+                )}
+                {pollResult && (
+                  <Button
+                    onClick={() => {
+                      setPollResult(null);
+                      handlePollDevice();
+                    }}
+                    loading={isPolling}
+                    disabled={!pollMethods.icmp && !pollMethods.snmp}
+                  >
+                    Poll Again
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );

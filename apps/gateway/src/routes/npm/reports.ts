@@ -12,9 +12,24 @@ import type {
   TableCell,
 } from "pdfmake/interfaces";
 
-// Use require for pdfmake (it exports a singleton for Node.js)
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pdfMake = require("pdfmake");
+// Dynamic import for pdfmake to handle ESM/CJS compatibility
+let printer: InstanceType<typeof import("pdfmake")> | null = null;
+
+const initPrinter = async () => {
+  if (!printer) {
+    const PdfPrinter = (await import("pdfmake")).default;
+    const fonts = {
+      Helvetica: {
+        normal: "Helvetica",
+        bold: "Helvetica-Bold",
+        italics: "Helvetica-Oblique",
+        bolditalics: "Helvetica-BoldOblique",
+      },
+    };
+    printer = new PdfPrinter(fonts);
+  }
+  return printer;
+};
 
 // Query schema for report parameters
 const reportQuerySchema = z.object({
@@ -549,6 +564,13 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
         ],
       };
 
+      const pdfPrinter = await initPrinter();
+      const pdfDoc = pdfPrinter.createPdfKitDocument(docDefinition);
+
+      // Collect PDF chunks
+      const chunks: Buffer[] = [];
+      pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
+
       return new Promise((resolve, reject) => {
         pdfMake.createPdf(docDefinition).getBuffer(
           (buffer: Buffer) => {
@@ -985,6 +1007,12 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
             : []),
         ],
       };
+
+      const pdfPrinter = await initPrinter();
+      const pdfDoc = pdfPrinter.createPdfKitDocument(docDefinition);
+
+      const chunks: Buffer[] = [];
+      pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
 
       return new Promise((resolve, reject) => {
         pdfMake.createPdf(docDefinition).getBuffer(

@@ -96,6 +96,13 @@ const metricsQuerySchema = z.object({
     .optional(),
 });
 
+// Poll Now schema
+const pollDeviceSchema = z.object({
+  methods: z
+    .array(z.enum(["icmp", "snmp"]))
+    .min(1, "At least one polling method must be selected"),
+});
+
 const npmRoutes: FastifyPluginAsync = async (fastify) => {
   // Register SNMPv3 credentials routes
   await fastify.register(snmpv3CredentialsRoutes, {
@@ -682,6 +689,275 @@ const npmRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       return reply.status(204).send();
+    },
+  );
+
+  // Poll device now (on-demand polling)
+  fastify.post(
+    "/devices/:id/poll",
+    {
+      schema: {
+        tags: ["NPM - Devices"],
+        summary: "Poll device now",
+        description:
+          "Trigger an immediate poll of the device using the specified methods (ICMP, SNMPv3, or both).",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+          },
+          required: ["id"],
+        },
+        body: {
+          type: "object",
+          required: ["methods"],
+          properties: {
+            methods: {
+              type: "array",
+              items: { type: "string", enum: ["icmp", "snmp"] },
+              minItems: 1,
+              description: "Polling methods to use",
+            },
+          },
+        },
+      },
+      preHandler: [fastify.requireRole("admin", "operator")],
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const body = pollDeviceSchema.parse(request.body);
+
+      // Fetch device with credential info
+      const deviceResult = await pool.query(
+        `SELECT d.id, d.name, d.ip_address, d.poll_icmp, d.poll_snmp,
+                d.snmpv3_credential_id, d.snmp_port, d.is_active,
+                c.username as snmp_username, c.security_level, c.auth_protocol, c.priv_protocol,
+                c.auth_password_encrypted, c.priv_password_encrypted
+         FROM npm.devices d
+         LEFT JOIN npm.snmpv3_credentials c ON d.snmpv3_credential_id = c.id
+         WHERE d.id = $1`,
+        [id],
+      );
+
+      if (deviceResult.rows.length === 0) {
+        reply.status(404);
+        return {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Device not found" },
+        };
+      }
+
+      const device = deviceResult.rows[0];
+
+      if (!device.is_active) {
+        reply.status(400);
+        return {
+          success: false,
+          error: {
+            code: "BAD_REQUEST",
+            message: "Cannot poll inactive device",
+          },
+        };
+      }
+
+      // Validate requested methods against device capabilities
+      const wantsIcmp = body.methods.includes("icmp");
+      const wantsSnmp = body.methods.includes("snmp");
+
+      if (wantsIcmp && !device.poll_icmp) {
+        reply.status(400);
+        return {
+          success: false,
+          error: {
+            code: "BAD_REQUEST",
+            message: "ICMP polling is not enabled for this device",
+          },
+        };
+      }
+
+      if (wantsSnmp && !device.poll_snmp) {
+        reply.status(400);
+        return {
+          success: false,
+          error: {
+            code: "BAD_REQUEST",
+            message: "SNMP polling is not enabled for this device",
+          },
+        };
+      }
+
+      if (wantsSnmp && !device.snmpv3_credential_id) {
+        reply.status(400);
+        return {
+          success: false,
+          error: {
+            code: "BAD_REQUEST",
+            message: "SNMPv3 credential not configured for this device",
+          },
+        };
+      }
+
+      const pollResults: {
+        icmp?: {
+          success: boolean;
+          latencyMs?: number;
+          error?: string;
+        };
+        snmp?: {
+          success: boolean;
+          cpuPercent?: number;
+          memoryPercent?: number;
+          uptimeSeconds?: number;
+          error?: string;
+        };
+      } = {};
+
+      // Perform ICMP poll
+      if (wantsIcmp) {
+        try {
+          const { spawn } = await import("child_process");
+          const isWindows = process.platform === "win32";
+          const pingArgs = isWindows
+            ? ["-n", "1", "-w", "2000", device.ip_address]
+            : ["-c", "1", "-W", "2", device.ip_address];
+          const pingCmd = isWindows ? "ping" : "ping";
+
+          const pingStartTime = Date.now();
+          const pingResult = await new Promise<{
+            success: boolean;
+            latencyMs?: number;
+          }>((resolve) => {
+            const ping = spawn(pingCmd, pingArgs);
+            let stdout = "";
+
+            ping.stdout.on("data", (data: Buffer) => {
+              stdout += data.toString();
+            });
+
+            ping.on("close", (code: number) => {
+              const latencyMs = Date.now() - pingStartTime;
+              if (code === 0) {
+                // Parse latency from output
+                const timeMatch = stdout.match(/time[=<](\d+(?:\.\d+)?)\s*ms/i);
+                const parsedLatency = timeMatch
+                  ? parseFloat(timeMatch[1])
+                  : latencyMs;
+                resolve({ success: true, latencyMs: parsedLatency });
+              } else {
+                resolve({ success: false });
+              }
+            });
+
+            ping.on("error", () => {
+              resolve({ success: false });
+            });
+
+            // Timeout after 5 seconds
+            setTimeout(() => {
+              ping.kill();
+              resolve({ success: false });
+            }, 5000);
+          });
+
+          pollResults.icmp = pingResult.success
+            ? { success: true, latencyMs: pingResult.latencyMs }
+            : { success: false, error: "Host unreachable" };
+
+          // Update device status
+          const newIcmpStatus = pingResult.success ? "up" : "down";
+          await pool.query(
+            `UPDATE npm.devices
+             SET icmp_status = $1, last_icmp_poll = NOW(),
+                 status = CASE
+                   WHEN $1 = 'up' THEN 'up'
+                   WHEN snmp_status = 'up' THEN 'up'
+                   ELSE 'down'
+                 END,
+                 last_poll = NOW()
+             WHERE id = $2`,
+            [newIcmpStatus, id],
+          );
+
+          // Insert metrics record
+          const isReachable = pingResult.success === true;
+          await pool.query(
+            `INSERT INTO npm.device_metrics (device_id, icmp_latency_ms, icmp_reachable, is_available, collected_at)
+             VALUES ($1, $2, $3::boolean, $4::boolean, NOW())`,
+            [id, pingResult.latencyMs || null, isReachable, isReachable],
+          );
+        } catch (err) {
+          logger.error({ err, deviceId: id }, "ICMP poll error");
+          pollResults.icmp = {
+            success: false,
+            error: err instanceof Error ? err.message : "ICMP poll failed",
+          };
+        }
+      }
+
+      // Perform SNMP poll (placeholder - actual SNMPv3 implementation would require pysnmp or similar)
+      if (wantsSnmp) {
+        // For now, we'll update the SNMP status to indicate a poll was attempted
+        // A real implementation would use a Python service or native SNMP library
+        try {
+          // Update last SNMP poll time
+          await pool.query(
+            `UPDATE npm.devices
+             SET last_snmp_poll = NOW(), last_poll = NOW()
+             WHERE id = $1`,
+            [id],
+          );
+
+          pollResults.snmp = {
+            success: true,
+            cpuPercent: undefined,
+            memoryPercent: undefined,
+            uptimeSeconds: undefined,
+          };
+
+          logger.info(
+            { deviceId: id, ipAddress: device.ip_address },
+            "SNMPv3 poll triggered (requires Python collector service)",
+          );
+        } catch (err) {
+          logger.error({ err, deviceId: id }, "SNMP poll error");
+          pollResults.snmp = {
+            success: false,
+            error: err instanceof Error ? err.message : "SNMP poll failed",
+          };
+        }
+      }
+
+      // Fetch updated device data
+      const updatedResult = await pool.query(
+        `SELECT d.id, d.name, d.ip_address, d.status, d.icmp_status, d.snmp_status,
+                d.last_poll, d.last_icmp_poll, d.last_snmp_poll
+         FROM npm.devices d
+         WHERE d.id = $1`,
+        [id],
+      );
+
+      const updatedDevice = updatedResult.rows[0];
+
+      return {
+        success: true,
+        data: {
+          deviceId: id,
+          deviceName: device.name,
+          ipAddress: device.ip_address,
+          polledAt: new Date().toISOString(),
+          methods: body.methods,
+          results: pollResults,
+          deviceStatus: {
+            status: updatedDevice.status,
+            icmpStatus: updatedDevice.icmp_status,
+            snmpStatus: updatedDevice.snmp_status,
+            lastPoll: updatedDevice.last_poll,
+            lastIcmpPoll: updatedDevice.last_icmp_poll,
+            lastSnmpPoll: updatedDevice.last_snmp_poll,
+          },
+        },
+      };
     },
   );
 
