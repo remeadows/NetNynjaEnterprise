@@ -6,24 +6,30 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { pool } from "../../db";
-import PdfPrinter from "pdfmake";
 import type {
   TDocumentDefinitions,
   Content,
   TableCell,
 } from "pdfmake/interfaces";
 
-// PDF fonts configuration
-const fonts = {
-  Helvetica: {
-    normal: "Helvetica",
-    bold: "Helvetica-Bold",
-    italics: "Helvetica-Oblique",
-    bolditalics: "Helvetica-BoldOblique",
-  },
-};
+// Dynamic import for pdfmake to handle ESM/CJS compatibility
+let printer: InstanceType<typeof import("pdfmake")> | null = null;
 
-const printer = new PdfPrinter(fonts);
+const initPrinter = async () => {
+  if (!printer) {
+    const PdfPrinter = (await import("pdfmake")).default;
+    const fonts = {
+      Helvetica: {
+        normal: "Helvetica",
+        bold: "Helvetica-Bold",
+        italics: "Helvetica-Oblique",
+        bolditalics: "Helvetica-BoldOblique",
+      },
+    };
+    printer = new PdfPrinter(fonts);
+  }
+  return printer;
+};
 
 // Query schema for report parameters
 const scanReportQuerySchema = z.object({
@@ -470,7 +476,8 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
         ],
       };
 
-      const pdfDoc = printer.createPdfKitDocument(docDefinition);
+      const pdfPrinter = await initPrinter();
+      const pdfDoc = pdfPrinter.createPdfKitDocument(docDefinition);
 
       // Collect PDF chunks
       const chunks: Buffer[] = [];
@@ -876,7 +883,8 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
         ],
       };
 
-      const pdfDoc = printer.createPdfKitDocument(docDefinition);
+      const pdfPrinter = await initPrinter();
+      const pdfDoc = pdfPrinter.createPdfKitDocument(docDefinition);
 
       const chunks: Buffer[] = [];
       pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));

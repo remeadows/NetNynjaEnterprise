@@ -1,0 +1,78 @@
+{
+  "platform": "Windows 11 Pro",
+  "version": "10.0.26200",
+  "build": "26200",
+  "timestamp": "2026-01-08T12:54:00Z",
+  "profile": "infra",
+  "docker_version": "29.1.3",
+  "docker_compose_version": "2.40.3",
+  "summary": {
+    "passed": 19,
+    "failed": 0,
+    "skipped": 2,
+    "total": 21,
+    "pass_rate": 90
+  },
+  "tests": [
+    {
+      "test": "1.1 Windows version compatible (Windows 11 Pro Build 26200)",
+      "status": "pass"
+    },
+    { "test": "1.2 Docker installed (v29.1.3)", "status": "pass" },
+    { "test": "1.3 Docker Compose installed (v2.40.3)", "status": "pass" },
+    { "test": "1.4 Docker daemon running", "status": "pass" },
+    { "test": "1.5 WSL2 backend available", "status": "pass" },
+    { "test": "1.6 Docker using Linux containers", "status": "pass" },
+    { "test": "1.7 .env file exists", "status": "pass" },
+    {
+      "test": "1.8 Git line endings",
+      "status": "skip",
+      "reason": "Not explicitly configured - using .gitattributes"
+    },
+    { "test": "1.9 Sufficient disk space (77.8GB free)", "status": "pass" },
+    { "test": "1.10 GitHub SSH connectivity", "status": "pass" },
+    { "test": "2.1 Docker Compose configuration valid", "status": "pass" },
+    { "test": "2.2 Infrastructure services started", "status": "pass" },
+    { "test": "2.3 PostgreSQL accessible (localhost:5433)", "status": "pass" },
+    { "test": "2.4 Redis accessible (localhost:6379)", "status": "pass" },
+    { "test": "2.5 NATS healthy (HTTP 200)", "status": "pass" },
+    { "test": "2.6 Vault healthy (HTTP 200)", "status": "pass" },
+    { "test": "2.7 Prometheus healthy (HTTP 200)", "status": "pass" },
+    { "test": "2.8 Grafana healthy (HTTP 200 on port 3002)", "status": "pass" },
+    { "test": "2.9 VictoriaMetrics healthy (HTTP 200)", "status": "pass" },
+    { "test": "2.10 Loki healthy (HTTP 200)", "status": "pass" },
+    { "test": "2.11 Jaeger UI accessible (HTTP 200)", "status": "pass" },
+    { "test": "3.1 Long path support enabled", "status": "pass" },
+    {
+      "test": "3.2 Windows Defender exclusions",
+      "status": "skip",
+      "reason": "Manual verification recommended"
+    }
+  ],
+  "issues_found": [
+    {
+      "id": "WIN-001",
+      "severity": "low",
+      "description": "Docker not in PATH by default",
+      "resolution": "Docker Desktop bin directory not automatically added to PATH. Use full path or add manually."
+    },
+    {
+      "id": "WIN-002",
+      "severity": "medium",
+      "description": "Docker credential helper not in PATH",
+      "resolution": "Remove credsStore from ~/.docker/config.json or add Docker bin to PATH"
+    },
+    {
+      "id": "WIN-003",
+      "severity": "low",
+      "description": ".env file requires manual setup",
+      "resolution": "Copy .env.example to .env and set REDIS_PASSWORD and GRAFANA_PASSWORD"
+    }
+  ],
+  "notes": [
+    "All 10 infrastructure containers started and healthy",
+    "SSH authentication to GitHub working",
+    "Long paths enabled in Windows registry",
+    "WSL2 with Ubuntu as default distribution"
+  ]
+}
