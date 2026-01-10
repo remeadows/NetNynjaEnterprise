@@ -1,0 +1,43 @@
+apiVersion: v2
+name: netnynja-enterprise
+description: A Helm chart for NetNynja Enterprise - Unified Network Management Platform
+type: application
+version: 0.1.0
+appVersion: "0.2.0"
+
+home: https://github.com/remeadows/NetNynjaEnterprise
+sources:
+  - https://github.com/remeadows/NetNynjaEnterprise
+
+keywords:
+  - network
+  - monitoring
+  - ipam
+  - npm
+  - stig
+  - compliance
+  - security
+
+maintainers:
+  - name: NetNynja Team
+    email: support@netnynja.io
+
+dependencies:
+  - name: postgresql
+    version: "~14.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "~18.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: nats
+    version: "~1.1"
+    repository: https://nats-io.github.io/k8s/helm/charts/
+    condition: nats.enabled
+
+annotations:
+  artifacthub.io/license: Proprietary
+  artifacthub.io/signKey: |
+    fingerprint: XXX
+    url: https://netnynja.io/keys/helm.asc

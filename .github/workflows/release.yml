@@ -1,0 +1,406 @@
+# NetNynja Enterprise - Release Workflow
+#
+# This workflow automates the release process:
+# - Creates GitHub releases with auto-generated changelogs
+# - Triggers image builds and pushes
+# - Generates release artifacts
+#
+# Triggered on:
+# - Version tags (v*.*.*)
+# - Manual dispatch for pre-releases
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., v1.0.0)"
+        required: true
+        type: string
+      prerelease:
+        description: "Is this a pre-release?"
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/netnynja
+
+jobs:
+  # Validate and prepare release
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+            PRERELEASE="${{ inputs.prerelease }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+            if [[ "$VERSION" == *"-"* ]]; then
+              PRERELEASE="true"
+            else
+              PRERELEASE="false"
+            fi
+          fi
+
+          # Validate version format
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
+            echo "Invalid version format: $VERSION"
+            echo "Expected format: vX.Y.Z or vX.Y.Z-suffix"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Releasing version: $VERSION (prerelease: $PRERELEASE)"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [[ -z "$PREV_TAG" ]]; then
+            # First release - include all commits
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges HEAD)
+          else
+            # Get commits since last tag
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges ${PREV_TAG}..HEAD)
+          fi
+
+          # Escape for GitHub output
+          CHANGELOG="${CHANGELOG//'%'/'%25'}"
+          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
+          CHANGELOG="${CHANGELOG//$'\r'/'%0D'}"
+
+          echo "changelog=$CHANGELOG" >> $GITHUB_OUTPUT
+
+  # Run tests before release
+  run-tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: prepare-release
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_netnynja
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build packages
+        run: npm run build --workspaces --if-present
+
+      - name: Run tests
+        run: npm run test --workspaces --if-present
+        env:
+          NODE_ENV: test
+          POSTGRES_URL: postgresql://test:test@localhost:5432/test_netnynja
+          REDIS_URL: redis://localhost:6379/1
+          JWT_SECRET: test-jwt-secret-key-for-testing-only
+
+  # Build and push all images
+  build-images:
+    name: Build Images
+    runs-on: ubuntu-latest
+    needs: [prepare-release, run-tests]
+    strategy:
+      matrix:
+        service:
+          - name: gateway
+            context: .
+            dockerfile: ./apps/gateway/Dockerfile
+          - name: web-ui
+            context: .
+            dockerfile: ./apps/web-ui/Dockerfile
+          - name: auth-service
+            context: .
+            dockerfile: ./services/auth-service/Dockerfile
+          - name: ipam
+            context: ./apps/ipam
+            dockerfile: ./apps/ipam/Dockerfile
+          - name: npm
+            context: ./apps/npm
+            dockerfile: ./apps/npm/Dockerfile
+          - name: stig
+            context: ./apps/stig
+            dockerfile: ./apps/stig/Dockerfile
+          - name: syslog
+            context: ./apps/syslog
+            dockerfile: ./apps/syslog/Dockerfile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-${{ matrix.service.name }}
+          tags: |
+            type=raw,value=${{ needs.prepare-release.outputs.version }}
+            type=raw,value=latest,enable=${{ needs.prepare-release.outputs.is_prerelease == 'false' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Security scan all images
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: [prepare-release, build-images]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Trivy on all images
+        run: |
+          SERVICES="gateway web-ui auth-service ipam npm stig syslog"
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+
+          for service in $SERVICES; do
+            echo "Scanning ${{ env.IMAGE_PREFIX }}-$service:$VERSION"
+            docker run --rm \
+              aquasec/trivy image \
+              --severity CRITICAL,HIGH \
+              --exit-code 0 \
+              "${{ env.IMAGE_PREFIX }}-$service:$VERSION" || true
+          done
+
+  # Create GitHub release
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [prepare-release, build-images, security-scan]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create release notes
+        id: notes
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          cat > release-notes.md << 'EOF'
+          ## NetNynja Enterprise ${{ needs.prepare-release.outputs.version }}
+
+          ### What's New
+
+          ${{ needs.prepare-release.outputs.changelog }}
+
+          ### Docker Images
+
+          All images are available on GitHub Container Registry:
+
+          ```bash
+          # Pull images
+          docker pull ${{ env.IMAGE_PREFIX }}-gateway:${{ needs.prepare-release.outputs.version }}
+          docker pull ${{ env.IMAGE_PREFIX }}-web-ui:${{ needs.prepare-release.outputs.version }}
+          docker pull ${{ env.IMAGE_PREFIX }}-auth-service:${{ needs.prepare-release.outputs.version }}
+          docker pull ${{ env.IMAGE_PREFIX }}-ipam:${{ needs.prepare-release.outputs.version }}
+          docker pull ${{ env.IMAGE_PREFIX }}-npm:${{ needs.prepare-release.outputs.version }}
+          docker pull ${{ env.IMAGE_PREFIX }}-stig:${{ needs.prepare-release.outputs.version }}
+          docker pull ${{ env.IMAGE_PREFIX }}-syslog:${{ needs.prepare-release.outputs.version }}
+          ```
+
+          ### Quick Start
+
+          ```bash
+          # Clone the repository
+          git clone https://github.com/${{ github.repository }}.git
+          cd netnynja-enterprise
+
+          # Start all services
+          docker compose --profile ipam --profile npm --profile stig up -d
+
+          # Access the UI
+          open http://localhost:3000
+          ```
+
+          ### Supported Platforms
+
+          - linux/amd64
+          - linux/arm64
+
+          ### Full Changelog
+
+          See [CHANGELOG.md](./CHANGELOG.md) for complete history.
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.version }}
+          name: NetNynja Enterprise ${{ needs.prepare-release.outputs.version }}
+          body_path: release-notes.md
+          prerelease: ${{ needs.prepare-release.outputs.is_prerelease == 'true' }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Generate Docker Compose bundle
+  generate-artifacts:
+    name: Generate Artifacts
+    runs-on: ubuntu-latest
+    needs: [prepare-release, create-release]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Docker Compose bundle
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+
+          # Create release directory
+          mkdir -p release-bundle
+
+          # Copy necessary files
+          cp docker-compose.yml release-bundle/
+          cp .env.example release-bundle/.env
+          cp -r infrastructure release-bundle/
+
+          # Update image tags in docker-compose.yml
+          # (In a real scenario, you'd update the image references)
+
+          # Create README for bundle
+          cat > release-bundle/README.md << EOF
+          # NetNynja Enterprise $VERSION
+
+          ## Quick Start
+
+          1. Copy \`.env\` to configure your environment
+          2. Run \`docker compose up -d\`
+          3. Access the UI at http://localhost:3000
+
+          ## Requirements
+
+          - Docker 24.0+
+          - Docker Compose 2.20+
+          - 8GB RAM minimum
+          - 50GB disk space
+
+          ## Support
+
+          - Documentation: https://github.com/${{ github.repository }}/wiki
+          - Issues: https://github.com/${{ github.repository }}/issues
+          EOF
+
+          # Create tarball
+          tar -czf netnynja-enterprise-${VERSION}.tar.gz release-bundle/
+
+          # Create checksums
+          sha256sum netnynja-enterprise-${VERSION}.tar.gz > netnynja-enterprise-${VERSION}.tar.gz.sha256
+
+      - name: Upload release artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.version }}
+          files: |
+            netnynja-enterprise-*.tar.gz
+            netnynja-enterprise-*.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Notify on release
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [prepare-release, create-release, generate-artifacts]
+    if: always()
+
+    steps:
+      - name: Release summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.prepare-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Pre-release:** ${{ needs.prepare-release.outputs.is_prerelease }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.create-release.result }}" == "success" ]]; then
+            echo "### Status: Released" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Release available at: https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Status: Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Release creation failed. Check workflow logs for details." >> $GITHUB_STEP_SUMMARY
+          fi

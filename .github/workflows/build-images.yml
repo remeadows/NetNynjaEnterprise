@@ -1,0 +1,488 @@
+# NetNynja Enterprise - Docker Image Build Workflow
+#
+# This workflow builds and pushes multi-platform Docker images for all services
+# Triggered on:
+# - Push to main/develop branches (build only)
+# - Release tags (build and push to registry)
+
+name: Build Docker Images
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "services/**"
+      - "infrastructure/**"
+      - "docker-compose.yml"
+      - "Dockerfile*"
+      - ".github/workflows/build-images.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      push_to_registry:
+        description: "Push images to registry"
+        required: false
+        default: "false"
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/netnynja
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Prepare build matrix and version info
+  prepare:
+    name: Prepare Build
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      should_push: ${{ steps.push.outputs.should_push }}
+      services: ${{ steps.services.outputs.services }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            VERSION="latest"
+          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            VERSION="develop"
+          else
+            VERSION="dev-${GITHUB_SHA::8}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Determine if should push
+        id: push
+        run: |
+          SHOULD_PUSH="false"
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            SHOULD_PUSH="true"
+          elif [[ "${{ inputs.push_to_registry }}" == "true" ]]; then
+            SHOULD_PUSH="true"
+          fi
+          echo "should_push=$SHOULD_PUSH" >> $GITHUB_OUTPUT
+
+      - name: List services to build
+        id: services
+        run: |
+          # Define services with their Dockerfile paths
+          SERVICES='["gateway","web-ui","ipam","npm","stig","syslog","auth-service"]'
+          echo "services=$SERVICES" >> $GITHUB_OUTPUT
+
+  # Build Gateway service
+  build-gateway:
+    name: Build Gateway
+    runs-on: ubuntu-latest
+    needs: prepare
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        if: needs.prepare.outputs.should_push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-gateway
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.version }}
+            type=sha,prefix=sha-
+
+      - name: Build and push Gateway
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/gateway/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ needs.prepare.outputs.should_push == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build Web UI service
+  build-web-ui:
+    name: Build Web UI
+    runs-on: ubuntu-latest
+    needs: prepare
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        if: needs.prepare.outputs.should_push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-web-ui
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.version }}
+            type=sha,prefix=sha-
+
+      - name: Build and push Web UI
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/web-ui/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ needs.prepare.outputs.should_push == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VITE_API_URL=/api
+
+  # Build Auth Service
+  build-auth-service:
+    name: Build Auth Service
+    runs-on: ubuntu-latest
+    needs: prepare
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        if: needs.prepare.outputs.should_push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-auth-service
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.version }}
+            type=sha,prefix=sha-
+
+      - name: Build and push Auth Service
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./services/auth-service/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ needs.prepare.outputs.should_push == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build IPAM Service
+  build-ipam:
+    name: Build IPAM Service
+    runs-on: ubuntu-latest
+    needs: prepare
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        if: needs.prepare.outputs.should_push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-ipam
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.version }}
+            type=sha,prefix=sha-
+
+      - name: Build and push IPAM
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/ipam
+          file: ./apps/ipam/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ needs.prepare.outputs.should_push == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build NPM Service
+  build-npm:
+    name: Build NPM Service
+    runs-on: ubuntu-latest
+    needs: prepare
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        if: needs.prepare.outputs.should_push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-npm
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.version }}
+            type=sha,prefix=sha-
+
+      - name: Build and push NPM
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/npm
+          file: ./apps/npm/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ needs.prepare.outputs.should_push == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build STIG Service
+  build-stig:
+    name: Build STIG Service
+    runs-on: ubuntu-latest
+    needs: prepare
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        if: needs.prepare.outputs.should_push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-stig
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.version }}
+            type=sha,prefix=sha-
+
+      - name: Build and push STIG
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/stig
+          file: ./apps/stig/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ needs.prepare.outputs.should_push == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build Syslog Service
+  build-syslog:
+    name: Build Syslog Service
+    runs-on: ubuntu-latest
+    needs: prepare
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        if: needs.prepare.outputs.should_push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-syslog
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.version }}
+            type=sha,prefix=sha-
+
+      - name: Build and push Syslog
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/syslog
+          file: ./apps/syslog/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ needs.prepare.outputs.should_push == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Security scan for built images
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs:
+      [
+        prepare,
+        build-gateway,
+        build-web-ui,
+        build-auth-service,
+        build-ipam,
+        build-npm,
+        build-stig,
+        build-syslog,
+      ]
+    if: needs.prepare.outputs.should_push == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Trivy vulnerability scanner on Gateway
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ env.IMAGE_PREFIX }}-gateway:${{ needs.prepare.outputs.version }}"
+          format: "sarif"
+          output: "trivy-gateway.sarif"
+          severity: "CRITICAL,HIGH"
+        continue-on-error: true
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-gateway.sarif"
+        continue-on-error: true
+
+  # Build summary
+  build-summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs:
+      [
+        prepare,
+        build-gateway,
+        build-web-ui,
+        build-auth-service,
+        build-ipam,
+        build-npm,
+        build-stig,
+        build-syslog,
+      ]
+    if: always()
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Docker Image Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.prepare.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Push to Registry:** ${{ needs.prepare.outputs.should_push }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Gateway | ${{ needs.build-gateway.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web UI | ${{ needs.build-web-ui.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Auth Service | ${{ needs.build-auth-service.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| IPAM | ${{ needs.build-ipam.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| NPM | ${{ needs.build-npm.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| STIG | ${{ needs.build-stig.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Syslog | ${{ needs.build-syslog.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.prepare.outputs.should_push }}" == "true" ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Image Tags" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Images pushed to \`${{ env.REGISTRY }}\` with tag \`${{ needs.prepare.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          fi

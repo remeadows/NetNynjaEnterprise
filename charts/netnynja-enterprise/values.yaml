@@ -1,0 +1,323 @@
+# NetNynja Enterprise - Helm Values
+# This file contains all configurable values for the NetNynja Enterprise Helm chart
+
+# Global settings
+global:
+  # Image registry for all NetNynja images
+  imageRegistry: ghcr.io/remeadows
+  # Image pull secrets
+  imagePullSecrets: []
+  # Storage class for all PVCs
+  storageClass: ""
+
+# Gateway service configuration
+gateway:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: netnynja-gateway
+    tag: ""  # Defaults to appVersion
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3001
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  env:
+    NODE_ENV: production
+    LOG_LEVEL: info
+
+# Web UI configuration
+webUI:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: netnynja-web-ui
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Auth service configuration
+authService:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: netnynja-auth-service
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3006
+  resources:
+    limits:
+      cpu: 300m
+      memory: 384Mi
+    requests:
+      cpu: 100m
+      memory: 192Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  config:
+    jwtAlgorithm: RS256
+    accessTokenExpiry: 15m
+    refreshTokenExpiry: 7d
+
+# IPAM service configuration
+ipam:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: netnynja-ipam
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3003
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# NPM service configuration
+npm:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: netnynja-npm
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3004
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  config:
+    pollerEnabled: true
+    pollIntervalMs: 300000  # 5 minutes
+    maxConcurrentPolls: 50
+    pollBatchSize: 100
+
+# STIG service configuration
+stig:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: netnynja-stig
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3005
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Syslog service configuration
+syslog:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: netnynja-syslog
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 514
+    protocol: UDP
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  persistence:
+    enabled: true
+    size: 10Gi
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: netnynja.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web-ui
+        - path: /api
+          pathType: Prefix
+          service: gateway
+  tls: []
+
+# PostgreSQL configuration (Bitnami subchart)
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: ""  # Set via secrets
+    database: netnynja
+    username: netnynja
+    password: ""  # Set via secrets
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+    initdb:
+      scripts:
+        init.sql: |
+          CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+          CREATE SCHEMA IF NOT EXISTS shared;
+          CREATE SCHEMA IF NOT EXISTS ipam;
+          CREATE SCHEMA IF NOT EXISTS npm;
+          CREATE SCHEMA IF NOT EXISTS stig;
+
+# Redis configuration (Bitnami subchart)
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: ""  # Set via secrets
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi
+
+# NATS configuration
+nats:
+  enabled: true
+  jetstream:
+    enabled: true
+    memStorage:
+      enabled: true
+      size: 1Gi
+    fileStorage:
+      enabled: true
+      size: 10Gi
+
+# External services (when not using subcharts)
+externalPostgres:
+  enabled: false
+  host: ""
+  port: 5432
+  database: netnynja
+  username: netnynja
+  existingSecret: ""
+
+externalRedis:
+  enabled: false
+  host: ""
+  port: 6379
+  existingSecret: ""
+
+externalNats:
+  enabled: false
+  host: ""
+  port: 4222
+
+# Observability configuration
+observability:
+  # Prometheus metrics
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+      namespace: ""
+      interval: 30s
+      scrapeTimeout: 10s
+
+  # Tracing configuration
+  tracing:
+    enabled: false
+    endpoint: ""  # Jaeger or OTLP endpoint
+
+  # Logging configuration
+  logging:
+    format: json
+    level: info
+
+# Security configuration
+security:
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+
+  # Container security context
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+  # Network policies
+  networkPolicy:
+    enabled: false
+
+# Service accounts
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Pod disruption budgets
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# Autoscaling (HPA)
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
