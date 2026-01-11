@@ -2,9 +2,9 @@
 
 > Active issues and technical debt tracking
 
-**Version**: 0.1.12
+**Version**: 0.1.13
 **Last Updated**: 2026-01-11 (Session)
-**Open Issues**: 5 | **Resolved Issues**: 107
+**Open Issues**: 4 | **Resolved Issues**: 108
 
 ## Issue Categories
 
@@ -28,33 +28,27 @@
 | CI-003 | 🔴       | Build Auth Service fails - @netnynja/shared-types not found         | build-images.yml        | Resolved |
 | CI-004 | 🔴       | Build Syslog Service fails - missing main.py                        | build-images.yml        | Resolved |
 | CI-005 | 🟠       | Validate Workspaces fails on all platforms (ubuntu, macos, windows) | validate-workspaces.yml | Open     |
-| CI-006 | 🟠       | Container Vulnerability Scan fails (gateway, web-ui)                | security-scan.yml       | Open     |
-| CI-007 | 🟠       | Infrastructure Scan, Secret Detection, CodeQL Analysis fail         | security-scan.yml       | Open     |
+| CI-006 | 🟠       | Container Vulnerability Scan Docker build errors                    | security-scan.yml       | Resolved |
+| CI-007 | 🟠       | CodeQL Analysis fails - Code scanning not enabled                   | security-scan.yml       | Open     |
 | CI-008 | 🔴       | test.yml invalid workflow - hashFiles() unrecognized function       | test.yml (Line 110)     | Resolved |
 | CI-009 | 🟠       | CodeQL Action v3 deprecation warning                                | security-scan.yml       | Resolved |
 | CI-010 | 🔴       | "Resource not accessible by integration" permission errors          | security-scan.yml       | Resolved |
 
-**Security Scan Summary (2026-01-11):**
+**Security Scan Summary (2026-01-11 - Latest):**
 
 | Scan Type       | Status  |
 | --------------- | ------- |
-| Container Scan  | failure |
+| Container Scan  | success |
 | Dependency Scan | success |
-| IaC Scan        | failure |
-| Secret Scan     | failure |
+| IaC Scan        | success |
+| Secret Scan     | success |
 
-**CI-006/007/010 Root Cause Analysis:**
+**CI-007 Details (CodeQL Analysis):**
 
-- Container scans (gateway, web-ui) still failing with `@netnynja/shared-types` not found
-  - Note: This is in security-scan.yml, which may not have been updated with new Dockerfiles
-- All CodeQL/Secret/Infrastructure scans failing with "Resource not accessible by integration"
-  - Likely missing GitHub Actions permissions (needs `security-events: write`)
-  - May need repository settings update to allow workflow access
-
-**CI-009 Details:**
-
-- CodeQL Action v3 will be deprecated December 2026
-- Need to update all CodeQL Action references from v3 to v4
+- CodeQL Analysis jobs fail with "Code scanning is not enabled for this repository"
+- SARIF upload fails for same reason
+- **Action Required**: Enable Code Scanning in repository settings (Settings → Security → Code security and analysis)
+- Note: The scans themselves run successfully; only the upload to GitHub Security tab fails
 
 **Build Images Summary (2026-01-11):**
 
@@ -89,6 +83,9 @@
   - Upgraded all CodeQL actions from v3 to v4
   - Added `actions: read` permission to all jobs
   - Added `continue-on-error: true` to SARIF upload steps
+- ✅ CI-006: Fixed security-scan.yml container builds
+  - Removed redundant npm ci/build steps (Dockerfiles are self-contained)
+  - Container scans now build successfully
 
 ---
 
