@@ -2,9 +2,9 @@
 
 > Active issues and technical debt tracking
 
-**Version**: 0.1.16
+**Version**: 0.1.17
 **Last Updated**: 2026-01-11 (Session)
-**Open Issues**: 4 | **Resolved Issues**: 109 | **Deferred**: 1
+**Open Issues**: 4 | **Resolved Issues**: 110 | **Deferred**: 1
 
 ## Issue Categories
 
@@ -19,7 +19,7 @@
 
 ### GitHub Actions CI/CD Failures (2026-01-10)
 
-> Status: PARTIAL | Critical TypeScript errors fixed, remaining issues require CI environment validation
+> Status: ACTIVE | Security Scan ✅ passing, Tests workflow fix awaiting CI verification
 
 | ID     | Priority | Title                                                               | Workflow                | Status   |
 | ------ | -------- | ------------------------------------------------------------------- | ----------------------- | -------- |
@@ -33,19 +33,20 @@
 | CI-008 | 🔴       | test.yml invalid workflow - hashFiles() unrecognized function       | test.yml (Line 110)     | Resolved |
 | CI-009 | 🟠       | CodeQL Action v3 deprecation warning                                | security-scan.yml       | Resolved |
 | CI-010 | 🔴       | "Resource not accessible by integration" permission errors          | security-scan.yml       | Resolved |
-| CI-011 | 🟡       | Container Scan (gateway) build intermittently fails in CI           | security-scan.yml       | Open     |
+| CI-011 | 🟡       | Container Scan (gateway) build - DTS generation failure             | security-scan.yml       | Resolved |
 | CI-012 | 🟢       | npm audit: esbuild/vite moderate vulnerability (dev server only)    | Dependency              | Deferred |
+| CI-013 | 🟡       | Tests workflow fails - shared-types module not found                | test.yml                | Open     |
 
 **Security Scan Summary (2026-01-11 - Latest):**
 
-| Scan Type       | Status                          |
-| --------------- | ------------------------------- |
-| Container Scan  | partial (web-ui ✅, gateway ❌) |
-| Dependency Scan | success                         |
-| IaC Scan        | success                         |
-| Secret Scan     | success                         |
-| CodeQL (JS/TS)  | success                         |
-| CodeQL (Python) | success                         |
+| Scan Type       | Status  |
+| --------------- | ------- |
+| Container Scan  | success |
+| Dependency Scan | success |
+| IaC Scan        | success |
+| Secret Scan     | success |
+| CodeQL (JS/TS)  | success |
+| CodeQL (Python) | success |
 
 **CI-007 Details (CodeQL Analysis - Resolved):**
 
@@ -90,11 +91,12 @@
 - ✅ CI-006: Fixed security-scan.yml container builds
   - Removed redundant npm ci/build steps (Dockerfiles are self-contained)
   - Container scans now build successfully
-- 🔄 CI-011: Gateway container build fails intermittently in security-scan
-  - Applied cache scope fix (`scope=security-${{ matrix.image.name }}`) to prevent conflicts with multi-platform builds
-  - Web UI builds successfully, Gateway fails
-  - Builds work locally with `docker build --no-cache`
-  - May be transient CI resource issue
+- ✅ CI-011: Gateway container build in security-scan - RESOLVED
+  - Root cause: `tsup --dts` TypeScript declaration generation requires all @types/\* packages
+  - In Docker context, only runtime dependencies are installed, causing DTS to fail
+  - Fix: Changed Gateway and Auth Service Dockerfiles to use `npx tsup --no-dts`
+  - Production runtime doesn't need type declarations, only compiled JavaScript
+  - Security Scan workflow now passing all jobs
 
 **CI-012 Details (npm audit esbuild/vite - Deferred):**
 
@@ -104,6 +106,17 @@
 - **Not a production risk**: Only affects `vite dev` server, not production builds
 - **Fix**: Upgrade vite to 7.3.1+ (major version bump from 5.x)
 - **Deferred**: Requires testing React 18 compatibility with Vite 7.x, scheduled for future sprint
+
+**CI-013 Details (Tests workflow - Open):**
+
+- **Symptom**: TypeScript Tests job fails with "Cannot find module '@netnynja/shared-types'"
+- **Root cause**: `npm run build --workspaces --if-present` bypasses Turborepo dependency graph
+  - npm builds workspaces in alphabetical order, not dependency order
+  - apps/gateway builds before packages/shared-types, causing import failure
+- **Fix applied**: Changed test.yml to use `npm run build` which delegates to Turborepo
+  - Turborepo respects the dependency graph defined in turbo.json
+  - Builds packages/shared-types → packages/shared-auth → apps/gateway in correct order
+- **Status**: Fix pushed, awaiting CI verification
 
 ---
 
