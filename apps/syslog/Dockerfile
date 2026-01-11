@@ -4,7 +4,7 @@
 # ============================================
 # Base stage with Python dependencies
 # ============================================
-FROM python:3.11-slim-bookworm as base
+FROM python:3.11-slim-bookworm AS base
 
 WORKDIR /app
 
@@ -16,19 +16,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy and install Python dependencies
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir -e ".[dev]"
-
-# Copy source code
 COPY src/ ./src/
+RUN pip install --no-cache-dir ".[dev]"
 
 # ============================================
 # Development stage
 # ============================================
-FROM base as development
+FROM base AS development
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV LOG_LEVEL=DEBUG
+ENV PYTHONPATH=/app/src
 
 # Install dev dependencies
 RUN pip install --no-cache-dir watchdog
@@ -39,10 +38,11 @@ CMD ["uvicorn", "syslog.main:app", "--host", "0.0.0.0", "--port", "3007", "--rel
 # ============================================
 # Collector stage (UDP 514 listener)
 # ============================================
-FROM base as collector
+FROM base AS collector
 
 ENV PYTHONUNBUFFERED=1
 ENV LOG_LEVEL=INFO
+ENV PYTHONPATH=/app/src
 
 # Run as non-root for security (port 514 requires capabilities)
 RUN useradd -m -u 1000 syslog
@@ -53,10 +53,11 @@ CMD ["python", "-m", "syslog.collector"]
 # ============================================
 # Forwarder stage
 # ============================================
-FROM base as forwarder
+FROM base AS forwarder
 
 ENV PYTHONUNBUFFERED=1
 ENV LOG_LEVEL=INFO
+ENV PYTHONPATH=/app/src
 
 RUN useradd -m -u 1000 syslog
 USER syslog
@@ -66,7 +67,7 @@ CMD ["python", "-m", "syslog.forwarder"]
 # ============================================
 # Production stage
 # ============================================
-FROM python:3.11-slim-bookworm as production
+FROM python:3.11-slim-bookworm AS production
 
 WORKDIR /app
 
@@ -88,6 +89,7 @@ USER syslog
 
 ENV PYTHONUNBUFFERED=1
 ENV LOG_LEVEL=INFO
+ENV PYTHONPATH=/app/src
 
 CMD ["uvicorn", "syslog.main:app", "--host", "0.0.0.0", "--port", "3007"]
 

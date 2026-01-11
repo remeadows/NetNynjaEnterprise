@@ -1,5 +1,5 @@
 # NetNynja Enterprise - Web UI Dockerfile
-# Development stage uses volume mounts from docker-compose
+# Multi-stage build for development and production
 
 # ============================================
 # Base stage
@@ -9,13 +9,53 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
 # ============================================
+# Dependencies stage - install all workspace deps
+# ============================================
+FROM base AS deps
+WORKDIR /app
+
+# Copy root package files
+COPY package.json package-lock.json turbo.json ./
+
+# Copy workspace package.json files
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/shared-ui/package.json ./packages/shared-ui/
+COPY apps/web-ui/package.json ./apps/web-ui/
+
+# Install dependencies
+RUN npm ci --legacy-peer-deps
+
+# ============================================
+# Builder stage - build shared packages and web-ui
+# ============================================
+FROM base AS builder
+WORKDIR /app
+
+# Copy deps from previous stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy source files
+COPY package.json package-lock.json turbo.json tsconfig.base.json ./
+COPY packages/shared-types ./packages/shared-types
+COPY packages/shared-ui ./packages/shared-ui
+COPY apps/web-ui ./apps/web-ui
+
+# Build shared packages first, then web-ui
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=${VITE_API_URL}
+
+RUN npm run build -w packages/shared-types && \
+    npm run build -w packages/shared-ui && \
+    npm run build -w apps/web-ui
+
+# ============================================
 # Development stage (uses volume mounts)
 # ============================================
 FROM base AS development
 WORKDIR /app
 
 # Copy package.json for deps reference
-COPY package.json ./
+COPY apps/web-ui/package.json ./
 
 # Create a modified package.json without workspace dependencies for container build
 RUN cat package.json | sed 's/"@netnynja\/shared-types": "\*",//g' | sed 's/"@netnynja\/shared-ui": "\*",//g' > package.temp.json && mv package.temp.json package.json
@@ -30,25 +70,38 @@ ENV NODE_ENV=development
 CMD ["sh", "-c", "ln -sf /app/node_modules /packages/shared-ui/node_modules 2>/dev/null; ln -sf /app/node_modules /packages/shared-types/node_modules 2>/dev/null; npx vite --host 0.0.0.0 --port 3000"]
 
 # ============================================
-# Build stage (for production)
-# ============================================
-FROM base AS builder
-WORKDIR /app
-COPY package.json ./
-RUN npm install 2>/dev/null || true
-COPY . .
-RUN npm run build 2>/dev/null || echo "Build requires shared packages"
-
-# ============================================
 # Production stage (nginx)
 # ============================================
 FROM nginx:1.25-alpine AS production
 
-# Copy built assets
-COPY --from=builder /app/dist /usr/share/nginx/html 2>/dev/null || true
+# Copy built assets from builder
+COPY --from=builder /app/apps/web-ui/dist/ /usr/share/nginx/html/
 
-# Create non-root user
-RUN chown -R nginx:nginx /usr/share/nginx/html 2>/dev/null || true
+# Create nginx config for SPA routing
+RUN echo 'server { \
+    listen 80; \
+    server_name localhost; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    location / { \
+        try_files $uri $uri/ /index.html; \
+    } \
+    location /api { \
+        proxy_pass http://gateway:3001; \
+        proxy_http_version 1.1; \
+        proxy_set_header Upgrade $http_upgrade; \
+        proxy_set_header Connection "upgrade"; \
+        proxy_set_header Host $host; \
+        proxy_set_header X-Real-IP $remote_addr; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
+
+# Create non-root user permissions
+RUN chown -R nginx:nginx /usr/share/nginx/html && \
+    chown -R nginx:nginx /var/cache/nginx && \
+    chown -R nginx:nginx /var/log/nginx && \
+    touch /var/run/nginx.pid && \
+    chown -R nginx:nginx /var/run/nginx.pid
 
 EXPOSE 80
 

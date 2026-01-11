@@ -1,5 +1,5 @@
 # NetNynja Enterprise - API Gateway Dockerfile
-# Development stage uses volume mounts from docker-compose
+# Multi-stage build for development and production
 
 # ============================================
 # Base stage
@@ -7,6 +7,43 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
+
+# ============================================
+# Dependencies stage - install all workspace deps
+# ============================================
+FROM base AS deps
+WORKDIR /app
+
+# Copy root package files
+COPY package.json package-lock.json turbo.json ./
+
+# Copy workspace package.json files
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/shared-auth/package.json ./packages/shared-auth/
+COPY apps/gateway/package.json ./apps/gateway/
+
+# Install dependencies
+RUN npm ci --legacy-peer-deps
+
+# ============================================
+# Builder stage - build shared packages and gateway
+# ============================================
+FROM base AS builder
+WORKDIR /app
+
+# Copy deps from previous stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy source files
+COPY package.json package-lock.json turbo.json tsconfig.base.json ./
+COPY packages/shared-types ./packages/shared-types
+COPY packages/shared-auth ./packages/shared-auth
+COPY apps/gateway ./apps/gateway
+
+# Build shared packages first, then gateway
+RUN npm run build -w packages/shared-types && \
+    npm run build -w packages/shared-auth && \
+    npm run build -w apps/gateway
 
 # ============================================
 # Development stage (uses volume mounts)
@@ -19,7 +56,7 @@ RUN apk add --no-cache nmap nmap-scripts && \
     npm install -g tsx pino-pretty
 
 # Copy package.json for deps reference
-COPY package.json ./
+COPY apps/gateway/package.json ./
 
 # Remove workspace dependencies and install
 RUN cat package.json | sed 's/"@netnynja\/shared-auth": "\*",//g' | sed 's/"@netnynja\/shared-types": "\*",//g' > package.temp.json && mv package.temp.json package.json
@@ -35,21 +72,13 @@ ENV PORT=3001
 CMD ["sh", "-c", "mkdir -p /app/node_modules/@netnynja && ln -sf /packages/shared-auth/dist /app/node_modules/@netnynja/shared-auth && ln -sf /packages/shared-types/dist /app/node_modules/@netnynja/shared-types && ln -sf /app/node_modules /packages/shared-auth/node_modules && ln -sf /app/node_modules /packages/shared-types/node_modules && tsx watch src/index.ts"]
 
 # ============================================
-# Build stage (for production)
-# ============================================
-FROM base AS builder
-WORKDIR /app
-COPY package.json ./
-RUN npm install --ignore-scripts 2>/dev/null || true
-COPY src ./src
-COPY tsup.config.ts tsconfig.json ./
-RUN npm run build 2>/dev/null || echo "Build requires shared packages"
-
-# ============================================
 # Production stage
 # ============================================
 FROM base AS production
 WORKDIR /app
+
+# Install nmap for network scanning
+RUN apk add --no-cache nmap nmap-scripts
 
 ENV NODE_ENV=production
 ENV PORT=3001
@@ -58,15 +87,22 @@ ENV PORT=3001
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 gateway
 
-COPY --from=builder /app/dist ./dist 2>/dev/null || true
-COPY --from=builder /app/node_modules ./node_modules 2>/dev/null || true
-COPY package.json ./
+# Copy built artifacts from builder
+COPY --from=builder /app/apps/gateway/dist ./dist
+COPY --from=builder /app/apps/gateway/package.json ./
+
+# Copy node_modules first
+COPY --from=builder /app/node_modules ./node_modules
+
+# Overlay built shared packages (replacing workspace symlinks)
+COPY --from=builder /app/packages/shared-types/dist ./node_modules/@netnynja/shared-types
+COPY --from=builder /app/packages/shared-auth/dist ./node_modules/@netnynja/shared-auth
 
 USER gateway
 
 EXPOSE 3001
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD wget --spider -q http://localhost:3001/healthz || exit 1
+    CMD wget --spider -q http://127.0.0.1:3001/healthz || exit 1
 
 CMD ["node", "dist/index.js"]

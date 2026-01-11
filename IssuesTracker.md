@@ -2,9 +2,9 @@
 
 > Active issues and technical debt tracking
 
-**Version**: 0.1.7
+**Version**: 0.1.8
 **Last Updated**: 2026-01-11 (Session)
-**Open Issues**: 3 | **Resolved Issues**: 101
+**Open Issues**: 3 | **Resolved Issues**: 105
 
 ## Issue Categories
 
@@ -23,19 +23,26 @@
 
 | ID     | Priority | Title                                                               | Workflow                | Status   |
 | ------ | -------- | ------------------------------------------------------------------- | ----------------------- | -------- |
-| CI-001 | 🔴       | Build Gateway fails - TypeScript errors in reports.ts (pdfMake)     | build-images.yml        | Resolved |
-| CI-002 | 🔴       | Build Web UI fails                                                  | build-images.yml        | Resolved |
-| CI-003 | 🔴       | Build Auth Service fails                                            | build-images.yml        | Resolved |
-| CI-004 | 🔴       | Build Syslog Service fails                                          | build-images.yml        | Resolved |
+| CI-001 | 🔴       | Build Gateway fails - @netnynja/shared-types not found              | build-images.yml        | Resolved |
+| CI-002 | 🔴       | Build Web UI fails - @netnynja/shared-types not found               | build-images.yml        | Resolved |
+| CI-003 | 🔴       | Build Auth Service fails - @netnynja/shared-types not found         | build-images.yml        | Resolved |
+| CI-004 | 🔴       | Build Syslog Service fails - missing main.py                        | build-images.yml        | Resolved |
 | CI-005 | 🟠       | Validate Workspaces fails on all platforms (ubuntu, macos, windows) | validate-workspaces.yml | Open     |
 | CI-006 | 🟠       | Container Vulnerability Scan fails (gateway, web-ui)                | security-scan.yml       | Open     |
 | CI-007 | 🟠       | Infrastructure Scan, Secret Detection, CodeQL Analysis fail         | security-scan.yml       | Open     |
 | CI-008 | 🔴       | test.yml invalid workflow - hashFiles() unrecognized function       | test.yml (Line 110)     | Resolved |
 
-**TypeScript Errors Fixed (2026-01-11):**
+**Docker Build Fixes (2026-01-11):**
 
-- ✅ Fixed pdfMake errors in IPAM and NPM reports.ts - Changed from non-existent `pdfMake.createPdf()` to proper `pdfDoc.end()` streaming
-- ✅ Fixed `string | undefined` errors in background-poller.ts, metrics.ts, npm/index.ts with proper null checks
+- ✅ CI-001/002/003: Rewrote Gateway, Web UI, Auth Service Dockerfiles with proper multi-stage builds
+  - Added `deps` stage to install monorepo workspace dependencies
+  - Added `builder` stage to build shared packages (shared-types, shared-auth, shared-ui) before app build
+  - Production stage copies built shared packages to node_modules/@netnynja/
+  - Added `target: production` to workflow build steps
+  - Removed redundant Node.js/npm pre-build steps from workflow (Docker handles all building)
+- ✅ CI-004: Created missing `apps/syslog/src/syslog/main.py` FastAPI entry point
+  - Added health endpoints (/healthz, /livez, /readyz)
+  - Imported settings from config module
 
 ---
 

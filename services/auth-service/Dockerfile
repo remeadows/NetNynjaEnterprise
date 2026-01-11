@@ -1,5 +1,5 @@
 # NetNynja Enterprise - Auth Service Dockerfile
-# Development stage uses volume mounts from docker-compose
+# Multi-stage build for development and production
 
 # ============================================
 # Base stage
@@ -7,6 +7,43 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
+
+# ============================================
+# Dependencies stage - install all workspace deps
+# ============================================
+FROM base AS deps
+WORKDIR /app
+
+# Copy root package files
+COPY package.json package-lock.json turbo.json ./
+
+# Copy workspace package.json files
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/shared-auth/package.json ./packages/shared-auth/
+COPY services/auth-service/package.json ./services/auth-service/
+
+# Install dependencies
+RUN npm ci --legacy-peer-deps
+
+# ============================================
+# Builder stage - build shared packages and auth-service
+# ============================================
+FROM base AS builder
+WORKDIR /app
+
+# Copy deps from previous stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy source files
+COPY package.json package-lock.json turbo.json tsconfig.base.json ./
+COPY packages/shared-types ./packages/shared-types
+COPY packages/shared-auth ./packages/shared-auth
+COPY services/auth-service ./services/auth-service
+
+# Build shared packages first, then auth-service
+RUN npm run build -w packages/shared-types && \
+    npm run build -w packages/shared-auth && \
+    npm run build -w services/auth-service
 
 # ============================================
 # Development stage (uses volume mounts)
@@ -18,7 +55,7 @@ WORKDIR /app
 RUN npm install -g tsx pino-pretty
 
 # Copy package.json for deps reference
-COPY package.json ./
+COPY services/auth-service/package.json ./
 
 # Remove workspace dependencies and install
 RUN cat package.json | sed 's/"@netnynja\/shared-auth": "\*",//g' | sed 's/"@netnynja\/shared-types": "\*",//g' > package.temp.json && mv package.temp.json package.json
@@ -34,17 +71,6 @@ ENV PORT=3006
 CMD ["sh", "-c", "mkdir -p /app/node_modules/@netnynja && ln -sf /packages/shared-auth/dist /app/node_modules/@netnynja/shared-auth && ln -sf /packages/shared-types/dist /app/node_modules/@netnynja/shared-types && ln -sf /app/node_modules /packages/shared-auth/node_modules && ln -sf /app/node_modules /packages/shared-types/node_modules && tsx watch src/index.ts"]
 
 # ============================================
-# Build stage (for production)
-# ============================================
-FROM base AS builder
-WORKDIR /app
-COPY package.json ./
-RUN npm install --ignore-scripts 2>/dev/null || true
-COPY src ./src
-COPY tsup.config.ts tsconfig.json ./
-RUN npm run build 2>/dev/null || echo "Build requires shared packages"
-
-# ============================================
 # Production stage
 # ============================================
 FROM base AS production
@@ -57,15 +83,22 @@ ENV PORT=3006
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 authsvc
 
-COPY --from=builder /app/dist ./dist 2>/dev/null || true
-COPY --from=builder /app/node_modules ./node_modules 2>/dev/null || true
-COPY package.json ./
+# Copy built artifacts from builder
+COPY --from=builder /app/services/auth-service/dist ./dist
+COPY --from=builder /app/services/auth-service/package.json ./
+
+# Copy node_modules first
+COPY --from=builder /app/node_modules ./node_modules
+
+# Overlay built shared packages (replacing workspace symlinks)
+COPY --from=builder /app/packages/shared-types/dist ./node_modules/@netnynja/shared-types
+COPY --from=builder /app/packages/shared-auth/dist ./node_modules/@netnynja/shared-auth
 
 USER authsvc
 
 EXPOSE 3006
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD wget --spider -q http://localhost:3006/healthz || exit 1
+    CMD wget --spider -q http://127.0.0.1:3006/healthz || exit 1
 
 CMD ["node", "dist/index.js"]
