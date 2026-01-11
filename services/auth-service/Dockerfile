@@ -6,7 +6,8 @@
 # ============================================
 FROM node:20-alpine AS base
 WORKDIR /app
-RUN apk add --no-cache libc6-compat
+# libc6-compat for compatibility, python3/make/g++ for native module compilation (argon2)
+RUN apk add --no-cache libc6-compat python3 make g++
 
 # ============================================
 # Dependencies stage - install all workspace deps
