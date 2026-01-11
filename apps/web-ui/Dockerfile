@@ -22,8 +22,8 @@ COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/shared-ui/package.json ./packages/shared-ui/
 COPY apps/web-ui/package.json ./apps/web-ui/
 
-# Install dependencies
-RUN npm ci --legacy-peer-deps
+# Install dependencies with optimizations for CI
+RUN npm ci --legacy-peer-deps && npm cache clean --force
 
 # ============================================
 # Builder stage - build shared packages and web-ui
@@ -31,18 +31,25 @@ RUN npm ci --legacy-peer-deps
 FROM base AS builder
 WORKDIR /app
 
-# Copy deps from previous stage
-COPY --from=deps /app/node_modules ./node_modules
-
-# Copy source files
+# Copy source files first
 COPY package.json package-lock.json turbo.json tsconfig.base.json ./
 COPY packages/shared-types ./packages/shared-types
 COPY packages/shared-ui ./packages/shared-ui
 COPY apps/web-ui ./apps/web-ui
 
-# Build shared packages first, then web-ui
+# Copy node_modules from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Ensure workspace package symlinks are correct in node_modules
+RUN mkdir -p node_modules/@netnynja && \
+    rm -rf node_modules/@netnynja/shared-types node_modules/@netnynja/shared-ui && \
+    ln -s ../../packages/shared-types node_modules/@netnynja/shared-types && \
+    ln -s ../../packages/shared-ui node_modules/@netnynja/shared-ui
+
+# Build shared packages first, then web-ui (with increased memory for CI)
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=${VITE_API_URL}
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 
 RUN npm run build -w packages/shared-types && \
     npm run build -w packages/shared-ui && \
