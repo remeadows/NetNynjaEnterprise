@@ -468,6 +468,8 @@ const stigRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request: FastifyRequest, reply) => {
       const data = await request.file();
+      const maxZipFiles = 500;
+      const maxUncompressedBytes = 100 * 1024 * 1024; // 100 MB
 
       if (!data) {
         reply.status(400);
@@ -494,6 +496,33 @@ const stigRoutes: FastifyPluginAsync = async (fastify) => {
 
         // Parse the ZIP file
         const directory = await unzipper.Open.buffer(fileBuffer);
+        const fileCount = directory.files.length;
+        if (fileCount > maxZipFiles) {
+          reply.status(400);
+          return {
+            success: false,
+            error: {
+              code: "ZIP_TOO_MANY_FILES",
+              message: `ZIP contains too many files (${fileCount}). Max allowed is ${maxZipFiles}.`,
+            },
+          };
+        }
+
+        const totalUncompressedBytes = directory.files.reduce((sum, file) => {
+          const uncompressed =
+            typeof file.uncompressedSize === "number" ? file.uncompressedSize : 0;
+          return sum + uncompressed;
+        }, 0);
+        if (totalUncompressedBytes > maxUncompressedBytes) {
+          reply.status(400);
+          return {
+            success: false,
+            error: {
+              code: "ZIP_TOO_LARGE",
+              message: `ZIP uncompressed size exceeds limit (${maxUncompressedBytes} bytes).`,
+            },
+          };
+        }
 
         let xccdfContent: string | null = null;
         let xccdfFilename: string | null = null;
