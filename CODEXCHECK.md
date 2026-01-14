@@ -72,9 +72,9 @@ Use local machine time for the timestamp. Format: `YYYYMMDD_HHMMSS`
 
 Identify:
 
-- Workspace layout: `apps/*`, `packages/*`, `services/*`, `Testing/*`
+- Workspace layout: `apps/*`, `packages/*`, `services/*`, `tests/*`
 - CI provider/config: `.github/workflows/*`
-- E2E harness entrypoint(s): `Testing/README.md`, `Testing/run_tests.sh`, `Testing/infrastructure/preflight.sh`
+- E2E harness entrypoint(s): `tests/e2e/README.md`, `tests/e2e/run_tests.sh`, `tests/infrastructure/preflight.sh`
 - Compose profiles/services: `docker-compose.yml` (+ overrides)
 - Env expectations: `.env.example`, `README.md`, `CONTEXT.md`
 
@@ -128,7 +128,7 @@ docker compose logs --tail=200 <unhealthy/restarting services only>
 #### C) Run preflight checks
 
 ```bash
-bash Testing/infrastructure/preflight.sh
+bash tests/infrastructure/preflight.sh
 ```
 
 **If preflight fails**, identify the FIRST hard blocker(s):
@@ -178,7 +178,7 @@ VALUES
 ON CONFLICT (username) DO NOTHING;
 ```
 
-Test credentials (configured in `Testing/conftest.py`):
+Test credentials (configured in `tests/e2e/conftest.py`):
 | User | Password | Role |
 |------|----------|------|
 | e2e_admin | E2EAdminPass123 | admin |
@@ -203,14 +203,14 @@ Restart gateway after changes: `docker compose restart gateway`
 **Quick test (gateway + auth only):**
 
 ```bash
-cd Testing
+cd tests/e2e
 python3 -m pytest test_01_authentication.py test_02_gateway.py -v --tb=short
 ```
 
 **Full E2E suite:**
 
 ```bash
-cd Testing
+cd tests/e2e
 python3 -m pytest -v --tb=short --html=reports/api-test-report.html
 ```
 
@@ -233,7 +233,7 @@ Capture:
 
 - Total passed/failed/errors
 - Duration
-- Report artifacts in `Testing/reports/`
+- Report artifacts in `tests/e2e/reports/`
 
 #### E) API Field Naming Convention
 
