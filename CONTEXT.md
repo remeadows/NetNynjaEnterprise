@@ -2,9 +2,9 @@
 
 > Comprehensive context for AI-assisted and human development
 
-**Version**: 0.2.2
-**Last Updated**: 2026-01-12 12:00 EST
-**Status**: Active Development - Phase 9 In Progress (2 Open, 116 Resolved)
+**Version**: 0.2.3
+**Last Updated**: 2026-01-14 12:00 EST
+**Status**: Active Development - Phase 9 In Progress (0 Open, 123 Resolved)
 
 ## Project Vision
 
@@ -248,11 +248,22 @@ Client → Gateway → Auth Service → Vault (JWT keys)
 
 ### Platform Considerations
 
-| Platform | Notes                                |
-| -------- | ------------------------------------ |
-| macOS    | Docker Desktop, host.docker.internal |
-| RHEL 9   | Podman compatible, SELinux :Z mounts |
-| Windows  | WSL2 backend, Linux containers       |
+| Platform | Notes                                                              |
+| -------- | ------------------------------------------------------------------ |
+| macOS    | Docker Desktop, host.docker.internal                               |
+| RHEL 9   | Podman compatible, SELinux :Z mounts                               |
+| Windows  | WSL2 backend, Linux containers, Hyper-V port remapping (see below) |
+
+### Windows Hyper-V Port Compatibility
+
+Windows Hyper-V reserves certain port ranges that conflict with standard service ports. The following port changes are applied for Windows compatibility:
+
+| Service      | Standard Port | Windows Port | Reason                           |
+| ------------ | ------------- | ------------ | -------------------------------- |
+| NATS Monitor | 8222          | 8322         | Avoid Hyper-V reserved 8139-8238 |
+| Vault        | 8200          | 8300         | Avoid Hyper-V reserved 8139-8238 |
+
+These port changes are configured in `docker-compose.yml` and apply to all platforms for consistency. Scripts (`preflight.sh`, `windows-smoke-test.ps1`) use the updated ports.
 
 ### Container Dependencies
 

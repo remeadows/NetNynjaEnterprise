@@ -128,7 +128,7 @@ docker compose logs --tail=200 <unhealthy/restarting services only>
 #### C) Run preflight checks
 
 ```bash
-bash infrastructure/preflight.sh
+bash Testing/infrastructure/preflight.sh
 ```
 
 **If preflight fails**, identify the FIRST hard blocker(s):

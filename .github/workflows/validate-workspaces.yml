@@ -130,8 +130,8 @@ jobs:
           "
         shell: bash
 
-      - name: Build shared packages
-        run: npm run build --workspaces --if-present
+      - name: Build packages via Turborepo
+        run: npm run build
         shell: bash
 
       - name: Type check workspaces

@@ -8,24 +8,9 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./ipam": {
-      "import": "./dist/ipam/index.mjs",
-      "require": "./dist/ipam/index.js",
-      "types": "./dist/ipam/index.d.ts"
-    },
-    "./npm": {
-      "import": "./dist/npm/index.mjs",
-      "require": "./dist/npm/index.js",
-      "types": "./dist/npm/index.d.ts"
-    },
-    "./stig": {
-      "import": "./dist/stig/index.mjs",
-      "require": "./dist/stig/index.js",
-      "types": "./dist/stig/index.d.ts"
+      "require": "./dist/index.js"
     }
   },
   "scripts": {

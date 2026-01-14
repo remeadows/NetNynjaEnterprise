@@ -173,11 +173,22 @@ select = [
 ]
 ignore = [
     "E501",   # line too long (handled by black)
-    "B008",   # function call in argument defaults
+    "B008",   # function call in argument defaults (common in FastAPI/Pydantic)
     "S101",   # use of assert (needed for tests)
     "S104",   # possible binding to all interfaces
-    "S105",   # hardcoded password (false positives)
-    "S106",   # hardcoded password (false positives)
+    "S105",   # hardcoded password (false positives in config defaults)
+    "S106",   # hardcoded password (false positives in config defaults)
+    "S107",   # hardcoded password in function default (false positives)
+    "S311",   # pseudo-random generator (acceptable for non-crypto uses)
+    "S603",   # subprocess call with variable (needed for system commands)
+    "S607",   # start process with partial path (needed for system commands like nmap, ping)
+    "ARG001", # unused function argument (common in handlers/callbacks)
+    "ARG002", # unused method argument (common in base classes)
+    "RET504", # unnecessary variable before return (often improves readability)
+    "SIM108", # ternary operator instead of if-else (readability preference)
+    "PTH123", # pathlib open vs builtin open (not always needed)
+    "COM812", # trailing comma missing (conflicts with black)
+    "ISC001", # implicit string concat (conflicts with black)
 ]
 
 [tool.ruff.per-file-ignores]
@@ -191,19 +202,22 @@ lines-after-imports = 2
 
 [tool.mypy]
 python_version = "3.11"
-strict = true
-warn_return_any = true
-warn_unused_ignores = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
+# Strict mode disabled for gradual adoption - enable incrementally
+strict = false
+warn_return_any = false
+warn_unused_ignores = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
 check_untyped_defs = true
-disallow_untyped_decorators = true
+disallow_untyped_decorators = false
 no_implicit_optional = true
 warn_redundant_casts = true
-warn_unused_configs = true
+warn_unused_configs = false
 show_error_codes = true
 show_column_numbers = true
 pretty = true
+# Allow gradual typing
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = [

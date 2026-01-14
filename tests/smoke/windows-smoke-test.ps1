@@ -44,14 +44,14 @@ function Write-TestPass {
     $script:TestResults += @{ test = $TestName; status = "pass" }
 }
 function Write-TestFail {
-    param($TestName, $Error)
-    Write-Host "[FAIL] $TestName: $Error" -ForegroundColor Red
+    param($TestName, $ErrorMsg)
+    Write-Host "[FAIL] ${TestName}: ${ErrorMsg}" -ForegroundColor Red
     $script:TestsFailed++
-    $script:TestResults += @{ test = $TestName; status = "fail"; error = $Error }
+    $script:TestResults += @{ test = $TestName; status = "fail"; error = $ErrorMsg }
 }
 function Write-TestSkip {
     param($TestName, $Reason)
-    Write-Host "[SKIP] $TestName: $Reason" -ForegroundColor Yellow
+    Write-Host "[SKIP] ${TestName}: ${Reason}" -ForegroundColor Yellow
     $script:TestsSkipped++
     $script:TestResults += @{ test = $TestName; status = "skip"; reason = $Reason }
 }
@@ -269,16 +269,16 @@ function Test-Infrastructure {
         Write-TestFail "2.4 Redis" "Cannot connect to port 6379"
     }
 
-    # Test 2.5: NATS
-    if (Test-HttpEndpoint -Url "http://localhost:8222/healthz") {
+    # Test 2.5: NATS (port 8322 - changed from 8222 for Windows Hyper-V compatibility)
+    if (Test-HttpEndpoint -Url "http://localhost:8322/healthz") {
         Write-TestPass "2.5 NATS healthy"
     }
     else {
         Write-TestFail "2.5 NATS" "Health check failed"
     }
 
-    # Test 2.6: Vault
-    if (Test-HttpEndpoint -Url "http://localhost:8200/v1/sys/health") {
+    # Test 2.6: Vault (port 8300 - changed from 8200 for Windows Hyper-V compatibility)
+    if (Test-HttpEndpoint -Url "http://localhost:8300/v1/sys/health") {
         Write-TestPass "2.6 Vault healthy"
     }
     else {

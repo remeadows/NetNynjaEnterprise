@@ -441,7 +441,8 @@ class TestNATSStreamIntegration:
         http_client: httpx.AsyncClient
     ):
         """All expected NATS streams are configured."""
-        response = await http_client.get("http://localhost:8222/jsz?streams=true")
+        # Port 8322 used instead of 8222 for Windows Hyper-V compatibility
+        response = await http_client.get("http://localhost:8322/jsz?streams=true")
         
         if response.status_code != 200:
             pytest.skip("Cannot access NATS monitoring")

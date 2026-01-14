@@ -28,8 +28,10 @@ REDIS_PORT="${REDIS_PORT:-6379}"
 REDIS_PASSWORD="${REDIS_PASSWORD:-redis-dev-2025}"
 NATS_HOST="${NATS_HOST:-localhost}"
 NATS_PORT="${NATS_PORT:-4222}"
-NATS_MONITOR_PORT="${NATS_MONITOR_PORT:-8222}"
-VAULT_ADDR="${VAULT_ADDR:-http://localhost:8200}"
+# Port 8322 used instead of 8222 for Windows Hyper-V compatibility
+NATS_MONITOR_PORT="${NATS_MONITOR_PORT:-8322}"
+# Port 8300 mapped externally to avoid Windows Hyper-V reserved range (8139-8238)
+VAULT_ADDR="${VAULT_ADDR:-http://localhost:8300}"
 VICTORIA_HOST="${VICTORIA_HOST:-localhost}"
 VICTORIA_PORT="${VICTORIA_PORT:-8428}"
 GATEWAY_URL="${GATEWAY_URL:-http://localhost:3001}"

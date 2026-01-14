@@ -304,8 +304,8 @@ poetry --version
 sudo firewall-cmd --permanent --add-port=3000-3007/tcp  # Application ports
 sudo firewall-cmd --permanent --add-port=5433/tcp      # PostgreSQL
 sudo firewall-cmd --permanent --add-port=6379/tcp      # Redis
-sudo firewall-cmd --permanent --add-port=8200/tcp      # Vault
-sudo firewall-cmd --permanent --add-port=8222/tcp      # NATS monitoring
+sudo firewall-cmd --permanent --add-port=8300/tcp      # Vault (Windows-safe port)
+sudo firewall-cmd --permanent --add-port=8322/tcp      # NATS monitoring (Windows-safe port)
 sudo firewall-cmd --permanent --add-port=9090/tcp      # Prometheus
 sudo firewall-cmd --permanent --add-port=16686/tcp     # Jaeger
 
@@ -390,9 +390,11 @@ docker compose logs -f gateway
 | Web UI          | http://localhost:3000  | admin / (from .env) |
 | API Gateway     | http://localhost:3001  | -                   |
 | Grafana         | http://localhost:3002  | admin / (from .env) |
-| NATS Monitoring | http://localhost:8222  | -                   |
+| NATS Monitoring | http://localhost:8322  | -                   |
 | Jaeger Tracing  | http://localhost:16686 | -                   |
-| Vault           | http://localhost:8200  | (dev token)         |
+| Vault           | http://localhost:8300  | (dev token)         |
+
+> **Note**: NATS and Vault use non-standard ports (8322, 8300) to avoid Windows Hyper-V reserved port range (8139-8238).
 
 > **Note**: See [DOCKER_STRUCTURE.md](DOCKER_STRUCTURE.md) for complete container architecture and port allocation.
 
