@@ -31,6 +31,8 @@ export interface IPAddress extends BaseEntity {
   status: IPStatus;
   deviceType?: string;
   description?: string;
+  responseTimeMs?: number; // Ping/TCP response latency in milliseconds
+  openPorts?: string; // Comma-separated list of open TCP ports
   lastSeen?: Date;
   discoveredAt?: Date;
 }

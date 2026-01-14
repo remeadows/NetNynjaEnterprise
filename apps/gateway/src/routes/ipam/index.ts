@@ -134,21 +134,21 @@ async function runPingScan(
         );
 
         if (existingResult.rows.length === 0) {
-          // New IP - insert it
+          // New IP - insert it with latency
           newCount++;
           await pool.query(
-            `INSERT INTO ipam.addresses (network_id, address, status, last_seen)
-             VALUES ($1, $2, 'active', NOW())
+            `INSERT INTO ipam.addresses (network_id, address, status, response_time_ms, last_seen, discovered_at)
+             VALUES ($1, $2, 'active', $3, NOW(), NOW())
              ON CONFLICT (network_id, address) DO UPDATE
-             SET status = 'active', last_seen = NOW()`,
-            [networkId, result.ip],
+             SET status = 'active', response_time_ms = COALESCE($3, ipam.addresses.response_time_ms), last_seen = NOW()`,
+            [networkId, result.ip, result.latency ?? null],
           );
         } else {
-          // Existing IP - update last_seen
+          // Existing IP - update last_seen and latency
           await pool.query(
-            `UPDATE ipam.addresses SET status = 'active', last_seen = NOW()
+            `UPDATE ipam.addresses SET status = 'active', response_time_ms = COALESCE($3, response_time_ms), last_seen = NOW()
              WHERE network_id = $1 AND address = $2`,
-            [networkId, result.ip],
+            [networkId, result.ip, result.latency ?? null],
           );
         }
       }
@@ -208,22 +208,22 @@ async function tcpConnect(
 
 /**
  * TCP ping a host by checking common ports
+ * Scans all ports and returns the full list of open ports
  */
 async function tcpPingHost(
   ip: string,
   ports: number[] = [22, 80, 443, 3389, 445, 23, 21, 25, 53, 8080],
   timeoutMs: number = 2000,
 ): Promise<{ ip: string; alive: boolean; openPorts: number[] }> {
-  const openPorts: number[] = [];
+  // Check all ports in parallel for speed
+  const portResults = await Promise.all(
+    ports.map(async (port) => {
+      const isOpen = await tcpConnect(ip, port, timeoutMs);
+      return { port, isOpen };
+    }),
+  );
 
-  for (const port of ports) {
-    const isOpen = await tcpConnect(ip, port, timeoutMs);
-    if (isOpen) {
-      openPorts.push(port);
-      // Return early on first open port for speed
-      return { ip, alive: true, openPorts };
-    }
-  }
+  const openPorts = portResults.filter((r) => r.isOpen).map((r) => r.port);
 
   return { ip, alive: openPorts.length > 0, openPorts };
 }
@@ -262,6 +262,10 @@ async function runTcpScan(
       if (result.alive) {
         activeCount++;
 
+        // Convert open ports array to comma-separated string
+        const openPortsStr =
+          result.openPorts.length > 0 ? result.openPorts.join(",") : null;
+
         // Check if IP already exists in database
         const existingResult = await pool.query(
           `SELECT id FROM ipam.addresses WHERE network_id = $1 AND address = $2`,
@@ -269,21 +273,21 @@ async function runTcpScan(
         );
 
         if (existingResult.rows.length === 0) {
-          // New IP - insert it
+          // New IP - insert it with open ports
           newCount++;
           await pool.query(
-            `INSERT INTO ipam.addresses (network_id, address, status, last_seen)
-             VALUES ($1, $2, 'active', NOW())
+            `INSERT INTO ipam.addresses (network_id, address, status, open_ports, last_seen, discovered_at)
+             VALUES ($1, $2, 'active', $3, NOW(), NOW())
              ON CONFLICT (network_id, address) DO UPDATE
-             SET status = 'active', last_seen = NOW()`,
-            [networkId, result.ip],
+             SET status = 'active', open_ports = COALESCE($3, ipam.addresses.open_ports), last_seen = NOW()`,
+            [networkId, result.ip, openPortsStr],
           );
         } else {
-          // Existing IP - update last_seen
+          // Existing IP - update last_seen and open ports
           await pool.query(
-            `UPDATE ipam.addresses SET status = 'active', last_seen = NOW()
+            `UPDATE ipam.addresses SET status = 'active', open_ports = COALESCE($3, open_ports), last_seen = NOW()
              WHERE network_id = $1 AND address = $2`,
-            [networkId, result.ip],
+            [networkId, result.ip, openPortsStr],
           );
         }
       }
@@ -830,7 +834,7 @@ const ipamRoutes: FastifyPluginAsync = async (fastify) => {
       );
 
       const dataResult = await pool.query(
-        `SELECT id, address, hostname, fqdn, mac_address, status, device_type, description, last_seen, discovered_at, created_at, updated_at
+        `SELECT id, address, hostname, fqdn, mac_address, status, device_type, description, response_time_ms, open_ports, last_seen, discovered_at, created_at, updated_at
        FROM ipam.addresses
        WHERE network_id = $1
        ORDER BY address
@@ -849,6 +853,10 @@ const ipamRoutes: FastifyPluginAsync = async (fastify) => {
           status: row.status,
           deviceType: row.device_type,
           description: row.description,
+          responseTimeMs: row.response_time_ms
+            ? parseFloat(row.response_time_ms)
+            : null,
+          openPorts: row.open_ports || null,
           lastSeen: row.last_seen,
           discoveredAt: row.discovered_at,
           createdAt: row.created_at,

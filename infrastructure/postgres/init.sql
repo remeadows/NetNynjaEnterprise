@@ -113,6 +113,8 @@ CREATE TABLE ipam.addresses (
     status VARCHAR(50) DEFAULT 'unknown' CHECK (status IN ('active', 'inactive', 'reserved', 'dhcp', 'unknown')),
     device_type VARCHAR(100),
     description TEXT,
+    response_time_ms NUMERIC(10, 3),  -- Ping/TCP response latency
+    open_ports TEXT,                   -- Comma-separated list of open ports
     last_seen TIMESTAMPTZ,
     discovered_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),

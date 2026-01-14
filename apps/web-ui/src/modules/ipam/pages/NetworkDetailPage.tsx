@@ -81,6 +81,46 @@ const getColumns = (enableSelection: boolean): ColumnDef<IPAddress>[] => {
         ),
     },
     {
+      accessorKey: "responseTimeMs",
+      header: "Latency",
+      cell: ({ row }) =>
+        row.original.responseTimeMs !== undefined &&
+        row.original.responseTimeMs !== null ? (
+          <span
+            className={`text-sm ${
+              row.original.responseTimeMs < 50
+                ? "text-green-600 dark:text-green-400"
+                : row.original.responseTimeMs < 200
+                  ? "text-yellow-600 dark:text-yellow-400"
+                  : "text-red-600 dark:text-red-400"
+            }`}
+          >
+            {row.original.responseTimeMs.toFixed(1)} ms
+          </span>
+        ) : (
+          "-"
+        ),
+    },
+    {
+      accessorKey: "openPorts",
+      header: "Open Ports",
+      cell: ({ row }) =>
+        row.original.openPorts ? (
+          <div className="flex flex-wrap gap-1">
+            {row.original.openPorts.split(",").map((port) => (
+              <span
+                key={port}
+                className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+              >
+                {port}
+              </span>
+            ))}
+          </div>
+        ) : (
+          "-"
+        ),
+    },
+    {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
