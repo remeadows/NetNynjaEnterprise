@@ -93,6 +93,7 @@
 - Category: Crypto
 - Evidence:
   - `apps/gateway/src/config.ts:73`
+
   ```ts
   CREDENTIAL_ENCRYPTION_KEY: z.string()
     .min(32)
@@ -100,9 +101,11 @@
   ```
 
   - `apps/gateway/src/routes/npm/snmpv3-credentials.ts:17`
+
   ```ts
   const key = crypto.scryptSync(config.CREDENTIAL_ENCRYPTION_KEY, "salt", 32);
   ```
+
 - Impact: A default encryption key plus a static salt makes SNMPv3 credential encryption predictable; compromise of one environment enables offline brute-force or reuse in others.
 - Recommendation: Remove defaults, require a high-entropy key via secrets manager, and use per-record random salt/IV derivation (store salt alongside ciphertext).
 - Suggested patch outline:
@@ -115,14 +118,17 @@
 - Category: Crypto
 - Evidence:
   - `apps/npm/src/npm/services/crypto.py:25`
+
   ```python
   self._key = key or settings.jwt_secret or "netnynja-***-redacted"
   ```
 
   - `apps/npm/src/npm/services/crypto.py:31`
+
   ```python
   salt=b"netnynja-npm-salt"  # Static salt
   ```
+
 - Impact: Reusing `JWT_SECRET` for encryption and providing a fallback key with static salt weakens confidentiality of stored credentials and enables offline attack reuse.
 - Recommendation: Use a dedicated encryption key (required) and a per-instance random salt; store salt alongside ciphertext.
 - Suggested patch outline:
@@ -149,16 +155,19 @@
 - Category: Auth
 - Evidence:
   - `apps/web-ui/src/stores/auth.ts:18`
+
   ```ts
   export const useAuthStore = create<AuthState>()(
     persist(
   ```
 
   - `apps/web-ui/src/stores/auth.ts:114`
+
   ```ts
   name: 'netnynja-auth',
   partialize: (state) => ({ tokens: state.tokens, ... })
   ```
+
 - Impact: `zustand` persistence defaults to `localStorage`, meaning access and refresh tokens are stored in the browser and exposed to XSS.
 - Recommendation: Prefer HttpOnly cookies for refresh tokens and keep access tokens in memory only; if local storage is unavoidable, add CSP + stricter XSS mitigations.
 - Suggested patch outline:
@@ -185,14 +194,17 @@
 - Category: Messaging
 - Evidence:
   - `apps/ipam/src/ipam/core/config.py:37`
+
   ```python
   nats_url: str = Field(default="nats://localhost:4222", alias="NATS_URL")
   ```
 
   - `apps/ipam/src/ipam/collectors/nats_handler.py:43`
+
   ```python
   self.nc = await nats.connect(settings.nats_url)
   ```
+
 - Impact: No explicit TLS/auth configuration is enforced; if `NATS_URL` is left at defaults or misconfigured, JetStream traffic may be unauthenticated and in cleartext. Needs confirmation based on deployment.
 - Recommendation: Require TLS and credentials in production; document and validate `NATS_URL` (e.g., `tls://` and creds/token options).
 - Suggested patch outline:
@@ -204,14 +216,17 @@
 - Category: Observability
 - Evidence:
   - `apps/npm/src/npm/services/metrics.py:38`
+
   ```python
   f'npm_device_cpu_utilization{device_id=...,device_name="{device_name}"} ...'
   ```
 
   - `apps/ipam/src/ipam/services/metrics.py:38`
+
   ```python
   f'ipam_network_total_addresses{network_id=...,network_name="{network_name}"} ...'
   ```
+
 - Impact: Unescaped label values can break Prometheus exposition format and high-cardinality labels (`device_name`, `interface_name`, `network_name`) can cause metrics DoS or PII leakage.
 - Recommendation: Escape label values and reduce cardinality (e.g., use IDs only or hash names).
 - Suggested patch outline:
