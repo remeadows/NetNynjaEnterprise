@@ -1,11 +1,11 @@
 # NetNynja Enterprise - Project Status
 
 **Version**: 0.2.3
-**Last Updated**: 2026-01-14 17:00 EST
+**Last Updated**: 2026-01-14 11:35 EST
 **Current Phase**: Phase 9 - CI/CD & Release (In Progress)
 **Overall Progress**: ▓▓▓▓▓▓▓▓▓▓ 99%
-**Issues**: 7 Open | 123 Resolved | 1 Deferred
-**Security Posture**: Medium (Codex Review 2026-01-14, 7 findings pending)
+**Issues**: 2 Open | 128 Resolved | 1 Deferred
+**Security Posture**: Low (Codex Review 2026-01-14, 2 low-priority findings pending)
 
 ---
 
@@ -776,6 +776,23 @@ Located in `charts/netnynja-enterprise/`:
 
 ### [Unreleased]
 
+#### Session 2026-01-14 (AM): E2E Blocker Fixes & Security Hardening
+
+**E2E Testing Unblocked:**
+
+- Fixed APP-012: Converted preflight.sh from CRLF to LF line endings
+- Fixed APP-013: Created preflight.ps1 PowerShell script for native Windows support
+- Fixed APP-014: Corrected OpenAPI endpoint from `/api/docs/openapi.json` to `/docs/json`
+- Created run-preflight.cmd Windows wrapper script
+
+**Security Hardening:**
+
+- SEC-006: Verified .env is properly gitignored (was already compliant)
+- SEC-007: Bound Postgres, Redis, NATS ports to 127.0.0.1 only in docker-compose.yml
+- Security posture improved from Medium to Low (2 low-priority items remaining)
+
+**Status:** All preflight checks pass (14/14). E2E testing ready.
+
 #### Session 2026-01-14 (Late PM): MIB Downloads & Codex Review Integration
 
 **Vendor MIB Library:**
@@ -788,7 +805,7 @@ Located in `charts/netnynja-enterprise/`:
   - Mellanox: 3 MIBs (Base, Products, Textual Conventions)
   - pfSense: 4 MIBs (Begemot PF, Host Resources, UCD-SNMP)
   - Sophos: 2 MIBs (SFOS Firewall)
-  - Standard: 8 MIBs (IF-MIB, ENTITY-MIB, SNMPv2-*)
+  - Standard: 8 MIBs (IF-MIB, ENTITY-MIB, SNMPv2-\*)
 
 **NPM OID Mappings:**
 

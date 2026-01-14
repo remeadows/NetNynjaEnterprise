@@ -39,7 +39,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
-      - "5433:5432"
+      # Bind to localhost only - prevents external access to database
+      - "127.0.0.1:5433:5432"
     healthcheck:
       <<: *healthcheck-defaults
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-netnynja}"]
@@ -56,7 +57,8 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      # Bind to localhost only - prevents external access to cache
+      - "127.0.0.1:6379:6379"
     healthcheck:
       <<: *healthcheck-defaults
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
@@ -78,8 +80,9 @@ services:
       - nats_data:/data
       - ./infrastructure/nats/nats.conf:/etc/nats/nats.conf:ro
     ports:
-      - "4222:4222" # Client connections
-      - "8322:8322" # HTTP monitoring (port changed for Windows compatibility)
+      # Bind to localhost only - prevents external access to message broker
+      - "127.0.0.1:4222:4222" # Client connections
+      - "127.0.0.1:8322:8322" # HTTP monitoring (port changed for Windows compatibility)
     healthcheck:
       <<: *healthcheck-defaults
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8322/healthz"]

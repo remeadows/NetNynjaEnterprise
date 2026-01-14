@@ -760,7 +760,7 @@ check_gateway() {
     log_test "OpenAPI documentation"
     test_start=$(date +%s%N)
     
-    local openapi=$(curl -sf "${GATEWAY_URL}/api/docs/openapi.json" 2>/dev/null)
+    local openapi=$(curl -sf "${GATEWAY_URL}/docs/json" 2>/dev/null)
     
     if echo "$openapi" | grep -q '"openapi"'; then
         log_pass "$(measure_time $test_start)"
