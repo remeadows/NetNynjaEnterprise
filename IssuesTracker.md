@@ -4,23 +4,46 @@
 
 **Version**: 0.1.23
 **Last Updated**: 2026-01-14
-**Stats**: 0 open | 1 deferred | 123 resolved (archived)
+**Stats**: 7 open | 1 deferred | 123 resolved (archived)
+**Codex Review**: 2026-01-14 08:51 (E2E: BLOCKED, Security: Medium)
 
 ---
 
 ## 🔥 NOW (Active / In Progress)
 
-- [x] All issues resolved — no active work items
+- [ ] APP-012 — Preflight script fails on Windows (CRLF + bash strict mode)
+- [ ] APP-013 — Preflight Docker checks fail (docker CLI not in bash PATH)
 
 ## ⏭️ NEXT (Queued / Ready)
 
+- [ ] APP-014 — Preflight OpenAPI check endpoint mismatch (`/api/docs/openapi.json` vs `/docs/json`)
+- [ ] SEC-006 — Remove `.env` from version control, rotate dev secrets
+- [ ] SEC-007 — Restrict Postgres/Redis/NATS host port exposure to localhost
+- [ ] SEC-008 — Enable NATS auth/TLS for non-dev profiles
+- [ ] SEC-009 — Make `trustProxy` configurable in auth-service
 - [ ] CI-012 — Upgrade Vite 5.x to 7.x (npm audit esbuild/vite moderate vulnerability) - Deferred
 - [ ] Phase 9 — Documentation site deployment (optional)
 - [ ] v0.2.3 Release — Tag and publish when ready
 
 ## ⛔ BLOCKED (Waiting / External Dependency)
 
-- None — no blocked items
+- [ ] E2E Tests — Blocked by APP-012, APP-013 (preflight must pass first)
+
+---
+
+## 📝 Open Issues (Codex Review 2026-01-14)
+
+| ID | P | Title | Category | Evidence |
+|----|---|-------|----------|----------|
+| APP-012 | 🔴 | Preflight CRLF errors on Windows | E2E Blocker | `Testing/infrastructure/preflight.sh` - CRLF line endings |
+| APP-013 | 🔴 | Preflight Docker checks fail | E2E Blocker | docker CLI not accessible in bash environment |
+| APP-014 | 🟠 | OpenAPI endpoint mismatch | E2E | Preflight checks `/api/docs/openapi.json`, gateway serves `/docs/json` |
+| SEC-006 | 🟠 | .env tracked with secrets | Secrets | `.env:11,21,35,52,106` - plaintext dev credentials |
+| SEC-007 | 🟠 | DB/Cache ports exposed | Database | `docker-compose.yml:42,59` - Postgres/Redis on all interfaces |
+| SEC-008 | 🟡 | NATS auth/TLS disabled | Messaging | `nats.conf:46,52` - auth/TLS commented out |
+| SEC-009 | 🟢 | trustProxy always true | Auth | `auth-service/src/index.ts:28` - spoofable X-Forwarded-For |
+
+**Recommended Fix Order**: APP-012 → APP-013 → APP-014 → SEC-006 → SEC-007 → SEC-008 → SEC-009
 
 ---
 

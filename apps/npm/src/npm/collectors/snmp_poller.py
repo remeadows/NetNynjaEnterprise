@@ -1,4 +1,16 @@
-"""SNMP polling service for device monitoring."""
+"""SNMP polling service for device monitoring.
+
+Supports vendor-specific OID mappings for:
+- Arista Networks (switches)
+- HPE Aruba (wireless controllers, switches)
+- Juniper Networks (routers, switches)
+- Mellanox/NVIDIA (high-performance switches)
+- pfSense (firewalls)
+- Sophos (XG/SFOS firewalls)
+
+MIB files: infrastructure/mibs/
+OID mappings: oid_mappings.py
+"""
 
 import asyncio
 from datetime import datetime, timezone
@@ -12,33 +24,40 @@ from ..models.interface import InterfaceCreate, InterfaceStatus, AdminStatus
 from ..models.metrics import DeviceMetrics, InterfaceMetrics
 from ..services.device import DeviceService
 from ..services.metrics import MetricsService
+from .oid_mappings import (
+    STANDARD_OIDS,
+    VendorType,
+    detect_vendor_from_sys_object_id,
+    get_all_oids_for_vendor,
+)
 
 logger = get_logger(__name__)
 
-# Standard SNMP OIDs
-OID_SYSTEM_DESCR = "1.3.6.1.2.1.1.1.0"
-OID_SYSTEM_UPTIME = "1.3.6.1.2.1.1.3.0"
-OID_SYSTEM_NAME = "1.3.6.1.2.1.1.5.0"
+# Standard SNMP OIDs (from oid_mappings.py for backward compatibility)
+OID_SYSTEM_DESCR = STANDARD_OIDS["system"]["sysDescr"].oid
+OID_SYSTEM_UPTIME = STANDARD_OIDS["system"]["sysUpTime"].oid
+OID_SYSTEM_NAME = STANDARD_OIDS["system"]["sysName"].oid
+OID_SYSTEM_OBJECT_ID = STANDARD_OIDS["system"]["sysObjectID"].oid
 
 # Interface OIDs (ifTable)
-OID_IF_NUMBER = "1.3.6.1.2.1.2.1.0"
+OID_IF_NUMBER = STANDARD_OIDS["interfaces"]["ifNumber"].oid
 OID_IF_TABLE = "1.3.6.1.2.1.2.2.1"
-OID_IF_DESCR = "1.3.6.1.2.1.2.2.1.2"
-OID_IF_TYPE = "1.3.6.1.2.1.2.2.1.3"
-OID_IF_SPEED = "1.3.6.1.2.1.2.2.1.5"
-OID_IF_PHYS_ADDRESS = "1.3.6.1.2.1.2.2.1.6"
-OID_IF_ADMIN_STATUS = "1.3.6.1.2.1.2.2.1.7"
-OID_IF_OPER_STATUS = "1.3.6.1.2.1.2.2.1.8"
-OID_IF_IN_OCTETS = "1.3.6.1.2.1.2.2.1.10"
-OID_IF_OUT_OCTETS = "1.3.6.1.2.1.2.2.1.16"
-OID_IF_IN_ERRORS = "1.3.6.1.2.1.2.2.1.14"
-OID_IF_OUT_ERRORS = "1.3.6.1.2.1.2.2.1.20"
+OID_IF_DESCR = STANDARD_OIDS["interfaces"]["ifDescr"].oid
+OID_IF_TYPE = STANDARD_OIDS["interfaces"]["ifType"].oid
+OID_IF_SPEED = STANDARD_OIDS["interfaces"]["ifSpeed"].oid
+OID_IF_PHYS_ADDRESS = STANDARD_OIDS["interfaces"]["ifPhysAddress"].oid
+OID_IF_ADMIN_STATUS = STANDARD_OIDS["interfaces"]["ifAdminStatus"].oid
+OID_IF_OPER_STATUS = STANDARD_OIDS["interfaces"]["ifOperStatus"].oid
+OID_IF_IN_OCTETS = STANDARD_OIDS["interfaces"]["ifInOctets"].oid
+OID_IF_OUT_OCTETS = STANDARD_OIDS["interfaces"]["ifOutOctets"].oid
+OID_IF_IN_ERRORS = STANDARD_OIDS["interfaces"]["ifInErrors"].oid
+OID_IF_OUT_ERRORS = STANDARD_OIDS["interfaces"]["ifOutErrors"].oid
 
 # ifXTable for 64-bit counters
-OID_IF_HC_IN_OCTETS = "1.3.6.1.2.1.31.1.1.1.6"
-OID_IF_HC_OUT_OCTETS = "1.3.6.1.2.1.31.1.1.1.10"
-OID_IF_NAME = "1.3.6.1.2.1.31.1.1.1.1"
-OID_IF_ALIAS = "1.3.6.1.2.1.31.1.1.1.18"
+OID_IF_HC_IN_OCTETS = STANDARD_OIDS["interfaces_hc"]["ifHCInOctets"].oid
+OID_IF_HC_OUT_OCTETS = STANDARD_OIDS["interfaces_hc"]["ifHCOutOctets"].oid
+OID_IF_NAME = STANDARD_OIDS["interfaces_hc"]["ifName"].oid
+OID_IF_ALIAS = STANDARD_OIDS["interfaces_hc"]["ifAlias"].oid
 
 
 class SNMPPoller:

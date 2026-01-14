@@ -1,11 +1,11 @@
 # NetNynja Enterprise - Project Status
 
 **Version**: 0.2.3
-**Last Updated**: 2026-01-14 15:00 EST
+**Last Updated**: 2026-01-14 17:00 EST
 **Current Phase**: Phase 9 - CI/CD & Release (In Progress)
 **Overall Progress**: ▓▓▓▓▓▓▓▓▓▓ 99%
-**Issues**: 0 Open | 123 Resolved | 1 Deferred
-**Security Posture**: Strong (Codex Review 2026-01-12, All Findings Remediated)
+**Issues**: 7 Open | 123 Resolved | 1 Deferred
+**Security Posture**: Medium (Codex Review 2026-01-14, 7 findings pending)
 
 ---
 
@@ -775,6 +775,40 @@ Located in `charts/netnynja-enterprise/`:
 ## Changelog
 
 ### [Unreleased]
+
+#### Session 2026-01-14 (Late PM): MIB Downloads & Codex Review Integration
+
+**Vendor MIB Library:**
+
+- Created `infrastructure/mibs/` directory structure with 7 vendor subdirectories
+- Downloaded 30 MIB files from official vendor sources:
+  - Arista: 5 MIBs (Products, SMI, Entity Sensor, Interface, BGP)
+  - HPE Aruba: 4 MIBs (Base, Switch, Wireless, System Extension)
+  - Juniper: 5 MIBs (Base, SMI, Chassis, Interface, Alarm)
+  - Mellanox: 3 MIBs (Base, Products, Textual Conventions)
+  - pfSense: 4 MIBs (Begemot PF, Host Resources, UCD-SNMP)
+  - Sophos: 2 MIBs (SFOS Firewall)
+  - Standard: 8 MIBs (IF-MIB, ENTITY-MIB, SNMPv2-*)
+
+**NPM OID Mappings:**
+
+- Created `apps/npm/src/npm/collectors/oid_mappings.py` (500+ OID definitions)
+- Vendor auto-detection via sysObjectID prefix matching
+- Standard OIDs: System, Interfaces (32/64-bit), Host Resources, Entity Sensors
+- Vendor-specific OIDs: CPU, memory, disk, temperature, fan speed, BGP, VPN, firewall states
+- Updated `snmp_poller.py` to import from centralized OID mappings
+
+**Codex Review 2026-01-14 Integration:**
+
+- Added 7 new issues from Codex review to IssuesTracker.md:
+  - APP-012: Preflight CRLF errors on Windows (Critical)
+  - APP-013: Preflight Docker checks fail (Critical)
+  - APP-014: OpenAPI endpoint mismatch (High)
+  - SEC-006: .env tracked with secrets (High)
+  - SEC-007: DB/Cache ports exposed (High)
+  - SEC-008: NATS auth/TLS disabled (Medium)
+  - SEC-009: trustProxy always true (Low)
+- E2E tests blocked until APP-012/APP-013 resolved
 
 #### Session 2026-01-14 (PM): Documentation Restructure
 
