@@ -396,7 +396,7 @@ docker compose logs -f gateway
 
 > **Note**: NATS and Vault use non-standard ports (8322, 8300) to avoid Windows Hyper-V reserved port range (8139-8238).
 
-> **Note**: See [DOCKER_STRUCTURE.md](DOCKER_STRUCTURE.md) for complete container architecture and port allocation.
+> **Note**: See [docs/DOCKER_STRUCTURE.md](docs/DOCKER_STRUCTURE.md) for complete container architecture and port allocation.
 
 ## Architecture
 
