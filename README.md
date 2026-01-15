@@ -29,12 +29,23 @@ NetNynja Enterprise consolidates four network management applications into a uni
 
 ### Prerequisites
 
+### For Deployment
+
 | Component | Version | Notes                  |
 | --------- | ------- | ---------------------- |
 | Docker    | 24+     | With Docker Compose V2 |
 | Node.js   | 20+     | For development        |
 | Python    | 3.11+   | For development        |
 | Poetry    | 1.7+    | Python package manager |
+
+### For Release Management (Optional)
+
+| Component | Version | Purpose                   |
+| --------- | ------- | ------------------------- |
+| Cosign    | 2.0+    | Container image signing   |
+| GPG       | 2.4+    | Commit & artifact signing |
+
+> See [RELEASE.md](RELEASE.md) for complete release workflow
 
 > See platform-specific installation guides above for detailed setup instructions.
 
@@ -203,13 +214,16 @@ poetry run mypy .
 
 ## Documentation
 
-| Document                                             | Description                     |
-| ---------------------------------------------------- | ------------------------------- |
-| [CLAUDE.md](CLAUDE.md)                               | AI-assisted development guide   |
-| [CONTEXT.md](CONTEXT.md)                             | Architecture and domain context |
-| [PROJECT_STATUS.md](PROJECT_STATUS.md)               | Current status and milestones   |
-| [docs/DOCKER_STRUCTURE.md](docs/DOCKER_STRUCTURE.md) | Container architecture          |
-| [docs/SESSION_HISTORY.md](docs/SESSION_HISTORY.md)   | Development session logs        |
+| Document                                                 | Description                       |
+| -------------------------------------------------------- | --------------------------------- |
+| [CLAUDE.md](CLAUDE.md)                                   | AI-assisted development guide     |
+| [CONTEXT.md](CONTEXT.md)                                 | Architecture and domain context   |
+| [PROJECT_STATUS.md](PROJECT_STATUS.md)                   | Current status and milestones     |
+| [COMMIT.md](COMMIT.md)                                   | Session commit workflow           |
+| [RELEASE.md](RELEASE.md)                                 | Release and code signing workflow |
+| [docs/CODE_SIGNING_GUIDE.md](docs/CODE_SIGNING_GUIDE.md) | Comprehensive code signing guide  |
+| [docs/DOCKER_STRUCTURE.md](docs/DOCKER_STRUCTURE.md)     | Container architecture            |
+| [docs/SESSION_HISTORY.md](docs/SESSION_HISTORY.md)       | Development session logs          |
 
 ## Contributing
 
