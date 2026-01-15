@@ -75,7 +75,9 @@ export async function testSNMPv3Credential(
       // Build user options based on security level
       const userOptions: snmp.UserOptions = {
         name: credential.username,
-        level: SECURITY_LEVELS[credential.securityLevel] ?? snmp.SecurityLevel.authPriv,
+        level:
+          SECURITY_LEVELS[credential.securityLevel] ??
+          snmp.SecurityLevel.authPriv,
       };
 
       // Add auth settings if needed
@@ -108,7 +110,11 @@ export async function testSNMPv3Credential(
       };
 
       // Create SNMPv3 session
-      const session = snmp.createV3Session(targetIp, userOptions, sessionOptions);
+      const session = snmp.createV3Session(
+        targetIp,
+        userOptions,
+        sessionOptions,
+      );
 
       // OIDs to query for device info
       const oids = [
@@ -156,7 +162,8 @@ export async function testSNMPv3Credential(
             result.sysName = value?.toString();
           } else if (oid === OID_SYS_UPTIME) {
             // sysUpTime is in hundredths of a second
-            result.sysUptime = typeof value === "number" ? Math.floor(value / 100) : undefined;
+            result.sysUptime =
+              typeof value === "number" ? Math.floor(value / 100) : undefined;
           } else if (oid === OID_SYS_CONTACT) {
             result.sysContact = value?.toString();
           } else if (oid === OID_SYS_LOCATION) {

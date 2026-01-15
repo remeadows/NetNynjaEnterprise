@@ -15,22 +15,25 @@ Network Performance Monitoring service for NetNynja Enterprise.
 ## Supported OIDs
 
 ### Device Metrics
-| Metric | Sophos SFOS OID | Description |
-|--------|-----------------|-------------|
-| CPU | 1.3.6.1.4.1.2604.5.1.2.1.1.0 | sfosCPUPercentUsage |
+
+| Metric | Sophos SFOS OID              | Description            |
+| ------ | ---------------------------- | ---------------------- |
+| CPU    | 1.3.6.1.4.1.2604.5.1.2.1.1.0 | sfosCPUPercentUsage    |
 | Memory | 1.3.6.1.4.1.2604.5.1.2.2.3.0 | sfosMemoryPercentUsage |
-| Disk | 1.3.6.1.4.1.2604.5.1.2.4.2.0 | sfosDiskPercentUsage |
-| Swap | 1.3.6.1.4.1.2604.5.1.2.5.4.0 | sfosSwapPercentUsage |
+| Disk   | 1.3.6.1.4.1.2604.5.1.2.4.2.0 | sfosDiskPercentUsage   |
+| Swap   | 1.3.6.1.4.1.2604.5.1.2.5.4.0 | sfosSwapPercentUsage   |
 
 ### Interface Metrics (IF-MIB RFC 2863)
-| Metric | OID | Description |
-|--------|-----|-------------|
-| In Octets | 1.3.6.1.2.1.31.1.1.1.6 | ifHCInOctets (64-bit) |
+
+| Metric     | OID                     | Description            |
+| ---------- | ----------------------- | ---------------------- |
+| In Octets  | 1.3.6.1.2.1.31.1.1.1.6  | ifHCInOctets (64-bit)  |
 | Out Octets | 1.3.6.1.2.1.31.1.1.1.10 | ifHCOutOctets (64-bit) |
-| In Errors | 1.3.6.1.2.1.2.2.1.14 | ifInErrors |
-| Out Errors | 1.3.6.1.2.1.2.2.1.20 | ifOutErrors |
+| In Errors  | 1.3.6.1.2.1.2.2.1.14    | ifInErrors             |
+| Out Errors | 1.3.6.1.2.1.2.2.1.20    | ifOutErrors            |
 
 ### Sophos Service Status
+
 Monitors 20+ services including Anti-Virus, Anti-Spam, IPS, Web Filter, VPN, and more.
 
 ## Development

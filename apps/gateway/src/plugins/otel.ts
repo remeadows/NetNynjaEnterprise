@@ -2,27 +2,27 @@
  * NetNynja Enterprise - OpenTelemetry Instrumentation
  */
 
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
-import { Resource } from '@opentelemetry/resources';
-import { config } from '../config';
-import { logger } from '../logger';
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
+import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
+import { Resource } from "@opentelemetry/resources";
+import { config } from "../config";
+import { logger } from "../logger";
 
 let sdk: NodeSDK | null = null;
 
 export function initTelemetry(): void {
   if (!config.OTEL_ENABLED) {
-    logger.info('OpenTelemetry disabled');
+    logger.info("OpenTelemetry disabled");
     return;
   }
 
   const resource = new Resource({
-    'service.name': 'netnynja-gateway',
-    'service.version': '0.1.0',
-    'deployment.environment': config.NODE_ENV,
+    "service.name": "netnynja-gateway",
+    "service.version": "0.1.0",
+    "deployment.environment": config.NODE_ENV,
   });
 
   const traceExporter = new OTLPTraceExporter({
@@ -42,22 +42,25 @@ export function initTelemetry(): void {
     }),
     instrumentations: [
       getNodeAutoInstrumentations({
-        '@opentelemetry/instrumentation-fs': { enabled: false },
-        '@opentelemetry/instrumentation-http': { enabled: true },
-        '@opentelemetry/instrumentation-fastify': { enabled: true },
-        '@opentelemetry/instrumentation-pg': { enabled: true },
-        '@opentelemetry/instrumentation-redis-4': { enabled: true },
+        "@opentelemetry/instrumentation-fs": { enabled: false },
+        "@opentelemetry/instrumentation-http": { enabled: true },
+        "@opentelemetry/instrumentation-fastify": { enabled: true },
+        "@opentelemetry/instrumentation-pg": { enabled: true },
+        "@opentelemetry/instrumentation-redis-4": { enabled: true },
       }),
     ],
   });
 
   sdk.start();
-  logger.info({ endpoint: config.OTEL_EXPORTER_ENDPOINT }, 'OpenTelemetry initialized');
+  logger.info(
+    { endpoint: config.OTEL_EXPORTER_ENDPOINT },
+    "OpenTelemetry initialized",
+  );
 }
 
 export async function shutdownTelemetry(): Promise<void> {
   if (sdk) {
     await sdk.shutdown();
-    logger.info('OpenTelemetry shutdown complete');
+    logger.info("OpenTelemetry shutdown complete");
   }
 }

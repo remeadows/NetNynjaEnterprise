@@ -2,9 +2,9 @@
  * NetNynja Enterprise - Auth Service Audit Logging
  */
 
-import { query } from './db';
-import { logger } from './logger';
-import type { AuditModule } from '@netnynja/shared-types';
+import { query } from "./db";
+import { logger } from "./logger";
+import type { AuditModule } from "@netnynja/shared-types";
 
 export interface AuditEvent {
   userId?: string;
@@ -24,7 +24,7 @@ export async function logAuditEvent(event: AuditEvent): Promise<void> {
   const {
     userId,
     action,
-    module = 'auth',
+    module = "auth",
     resourceType,
     resourceId,
     details,
@@ -46,13 +46,13 @@ export async function logAuditEvent(event: AuditEvent): Promise<void> {
         details ? JSON.stringify(details) : null,
         ipAddress || null,
         userAgent || null,
-      ]
+      ],
     );
 
-    logger.debug({ action, userId, module }, 'Audit event logged');
+    logger.debug({ action, userId, module }, "Audit event logged");
   } catch (error) {
     // Don't throw - audit logging should not break the main flow
-    logger.error({ error, event }, 'Failed to log audit event');
+    logger.error({ error, event }, "Failed to log audit event");
   }
 }
 
@@ -61,21 +61,21 @@ export async function logAuditEvent(event: AuditEvent): Promise<void> {
 // ============================================
 
 export const AuditActions = {
-  LOGIN_SUCCESS: 'LOGIN_SUCCESS',
-  LOGIN_FAILED: 'LOGIN_FAILED',
-  LOGOUT: 'LOGOUT',
-  LOGOUT_ALL: 'LOGOUT_ALL',
-  TOKEN_REFRESH: 'TOKEN_REFRESH',
-  TOKEN_REFRESH_FAILED: 'TOKEN_REFRESH_FAILED',
-  PASSWORD_CHANGE: 'PASSWORD_CHANGE',
-  PASSWORD_RESET_REQUEST: 'PASSWORD_RESET_REQUEST',
-  PASSWORD_RESET_COMPLETE: 'PASSWORD_RESET_COMPLETE',
-  ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',
-  ACCOUNT_UNLOCKED: 'ACCOUNT_UNLOCKED',
-  USER_CREATED: 'USER_CREATED',
-  USER_UPDATED: 'USER_UPDATED',
-  USER_DELETED: 'USER_DELETED',
-  ROLE_CHANGED: 'ROLE_CHANGED',
+  LOGIN_SUCCESS: "LOGIN_SUCCESS",
+  LOGIN_FAILED: "LOGIN_FAILED",
+  LOGOUT: "LOGOUT",
+  LOGOUT_ALL: "LOGOUT_ALL",
+  TOKEN_REFRESH: "TOKEN_REFRESH",
+  TOKEN_REFRESH_FAILED: "TOKEN_REFRESH_FAILED",
+  PASSWORD_CHANGE: "PASSWORD_CHANGE",
+  PASSWORD_RESET_REQUEST: "PASSWORD_RESET_REQUEST",
+  PASSWORD_RESET_COMPLETE: "PASSWORD_RESET_COMPLETE",
+  ACCOUNT_LOCKED: "ACCOUNT_LOCKED",
+  ACCOUNT_UNLOCKED: "ACCOUNT_UNLOCKED",
+  USER_CREATED: "USER_CREATED",
+  USER_UPDATED: "USER_UPDATED",
+  USER_DELETED: "USER_DELETED",
+  ROLE_CHANGED: "ROLE_CHANGED",
 } as const;
 
 export type AuditAction = (typeof AuditActions)[keyof typeof AuditActions];
@@ -87,12 +87,12 @@ export async function logLoginSuccess(
   userId: string,
   username: string,
   ipAddress?: string,
-  userAgent?: string
+  userAgent?: string,
 ): Promise<void> {
   await logAuditEvent({
     userId,
     action: AuditActions.LOGIN_SUCCESS,
-    resourceType: 'user',
+    resourceType: "user",
     resourceId: userId,
     details: { username },
     ipAddress,
@@ -107,11 +107,11 @@ export async function logLoginFailed(
   username: string,
   reason: string,
   ipAddress?: string,
-  userAgent?: string
+  userAgent?: string,
 ): Promise<void> {
   await logAuditEvent({
     action: AuditActions.LOGIN_FAILED,
-    resourceType: 'user',
+    resourceType: "user",
     details: { username, reason },
     ipAddress,
     userAgent,
@@ -124,12 +124,12 @@ export async function logLoginFailed(
 export async function logLogout(
   userId: string,
   ipAddress?: string,
-  userAgent?: string
+  userAgent?: string,
 ): Promise<void> {
   await logAuditEvent({
     userId,
     action: AuditActions.LOGOUT,
-    resourceType: 'user',
+    resourceType: "user",
     resourceId: userId,
     ipAddress,
     userAgent,
@@ -143,12 +143,12 @@ export async function logLogoutAll(
   userId: string,
   sessionCount: number,
   ipAddress?: string,
-  userAgent?: string
+  userAgent?: string,
 ): Promise<void> {
   await logAuditEvent({
     userId,
     action: AuditActions.LOGOUT_ALL,
-    resourceType: 'user',
+    resourceType: "user",
     resourceId: userId,
     details: { sessionCount },
     ipAddress,
@@ -162,12 +162,12 @@ export async function logLogoutAll(
 export async function logTokenRefresh(
   userId: string,
   ipAddress?: string,
-  userAgent?: string
+  userAgent?: string,
 ): Promise<void> {
   await logAuditEvent({
     userId,
     action: AuditActions.TOKEN_REFRESH,
-    resourceType: 'user',
+    resourceType: "user",
     resourceId: userId,
     ipAddress,
     userAgent,
@@ -180,11 +180,11 @@ export async function logTokenRefresh(
 export async function logAccountLocked(
   username: string,
   attempts: number,
-  ipAddress?: string
+  ipAddress?: string,
 ): Promise<void> {
   await logAuditEvent({
     action: AuditActions.ACCOUNT_LOCKED,
-    resourceType: 'user',
+    resourceType: "user",
     details: { username, attempts },
     ipAddress,
   });

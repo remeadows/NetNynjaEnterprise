@@ -52,7 +52,7 @@ datasources:
       derivedFields:
         - name: TraceID
           matcherRegex: '"trace_id":"([a-f0-9]+)"'
-          url: '$${__value.raw}'
+          url: "$${__value.raw}"
           datasourceUid: jaeger
           urlDisplayLabel: "View Trace"
 
@@ -67,16 +67,16 @@ datasources:
     jsonData:
       tracesToLogsV2:
         datasourceUid: loki
-        spanStartTimeShift: '-1h'
-        spanEndTimeShift: '1h'
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
         filterByTraceID: true
         filterBySpanID: true
       nodeGraph:
         enabled: true
       tracesToMetrics:
         datasourceUid: prometheus
-        spanStartTimeShift: '-1h'
-        spanEndTimeShift: '1h'
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
 
   # PostgreSQL - Direct Database Access (optional)
   - name: PostgreSQL

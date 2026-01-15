@@ -4,8 +4,8 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
-    cluster: 'netnynja-enterprise'
-    env: 'development'
+    cluster: "netnynja-enterprise"
+    env: "development"
 
 # Alertmanager configuration (if enabled)
 # alerting:
@@ -21,15 +21,15 @@ rule_files:
 # Scrape configurations
 scrape_configs:
   # Prometheus self-monitoring
-  - job_name: 'prometheus'
+  - job_name: "prometheus"
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ["localhost:9090"]
     metrics_path: /metrics
 
   # API Gateway
-  - job_name: 'gateway'
+  - job_name: "gateway"
     static_configs:
-      - targets: ['gateway:3001']
+      - targets: ["gateway:3001"]
     metrics_path: /metrics
     scrape_interval: 10s
 
@@ -37,67 +37,66 @@ scrape_configs:
   # - job_name: 'postgres'
   #   static_configs:
   #     - targets: ['postgres-exporter:9187']
-
   # Redis
-  - job_name: 'redis'
+  - job_name: "redis"
     static_configs:
-      - targets: ['redis:6379']
+      - targets: ["redis:6379"]
     metrics_path: /metrics
     # Redis doesn't expose metrics natively; use redis_exporter if needed
 
   # NATS
-  - job_name: 'nats'
+  - job_name: "nats"
     static_configs:
-      - targets: ['nats:8222']
+      - targets: ["nats:8222"]
     metrics_path: /metrics
 
   # VictoriaMetrics
-  - job_name: 'victoriametrics'
+  - job_name: "victoriametrics"
     static_configs:
-      - targets: ['victoriametrics:8428']
+      - targets: ["victoriametrics:8428"]
     metrics_path: /metrics
 
   # Loki
-  - job_name: 'loki'
+  - job_name: "loki"
     static_configs:
-      - targets: ['loki:3100']
+      - targets: ["loki:3100"]
     metrics_path: /metrics
 
   # Jaeger
-  - job_name: 'jaeger'
+  - job_name: "jaeger"
     static_configs:
-      - targets: ['jaeger:14269']
+      - targets: ["jaeger:14269"]
     metrics_path: /metrics
 
   # IPAM Services
-  - job_name: 'ipam-scanner'
+  - job_name: "ipam-scanner"
     static_configs:
-      - targets: ['ipam-scanner:8080']
+      - targets: ["ipam-scanner:8080"]
     metrics_path: /metrics
     scrape_interval: 30s
 
   # NPM Services
-  - job_name: 'npm-collector'
+  - job_name: "npm-collector"
     static_configs:
-      - targets: ['npm-collector:8080']
+      - targets: ["npm-collector:8080"]
     metrics_path: /metrics
     scrape_interval: 30s
 
-  - job_name: 'npm-alerts'
+  - job_name: "npm-alerts"
     static_configs:
-      - targets: ['npm-alerts:8080']
+      - targets: ["npm-alerts:8080"]
     metrics_path: /metrics
 
   # STIG Services
-  - job_name: 'stig-collector'
+  - job_name: "stig-collector"
     static_configs:
-      - targets: ['stig-collector:8080']
+      - targets: ["stig-collector:8080"]
     metrics_path: /metrics
     scrape_interval: 30s
 
-  - job_name: 'stig-reports'
+  - job_name: "stig-reports"
     static_configs:
-      - targets: ['stig-reports:8080']
+      - targets: ["stig-reports:8080"]
     metrics_path: /metrics
 
   # Docker containers (via cAdvisor if added)

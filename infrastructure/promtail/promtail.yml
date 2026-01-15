@@ -54,16 +54,16 @@ scrape_configs:
         refresh_interval: 5s
     relabel_configs:
       # Only keep containers with netnynja label or name prefix
-      - source_labels: ['__meta_docker_container_name']
-        regex: '/(netnynja-.*)'
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/(netnynja-.*)"
         action: keep
-      - source_labels: ['__meta_docker_container_name']
-        regex: '/(.*)'
-        target_label: 'container'
-      - source_labels: ['__meta_docker_container_log_stream']
-        target_label: 'logstream'
-      - source_labels: ['__meta_docker_network_name']
-        target_label: 'network'
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/(.*)"
+        target_label: "container"
+      - source_labels: ["__meta_docker_container_log_stream"]
+        target_label: "logstream"
+      - source_labels: ["__meta_docker_network_name"]
+        target_label: "network"
 
     pipeline_stages:
       # Parse JSON logs from application containers
@@ -112,7 +112,7 @@ scrape_configs:
           selector: '{container=~"netnynja-.*"}'
           stages:
             - drop:
-                expression: '.*GET /health.*'
+                expression: ".*GET /health.*"
                 drop_counter_reason: healthcheck
 
       # Add application label based on container name
@@ -120,7 +120,7 @@ scrape_configs:
           selector: '{container=~"netnynja-.*"}'
           stages:
             - regex:
-                expression: 'netnynja-(?P<app>[a-z]+).*'
+                expression: "netnynja-(?P<app>[a-z]+).*"
                 source: container
             - labels:
                 app:
@@ -141,7 +141,7 @@ scrape_configs:
           program:
       - timestamp:
           source: timestamp
-          format: 'Jan _2 15:04:05'
+          format: "Jan _2 15:04:05"
           location: Local
 
 # Limits

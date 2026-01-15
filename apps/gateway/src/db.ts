@@ -2,9 +2,9 @@
  * NetNynja Enterprise - API Gateway Database Client
  */
 
-import { Pool, PoolClient } from 'pg';
-import { config } from './config';
-import { logger } from './logger';
+import { Pool, PoolClient } from "pg";
+import { config } from "./config";
+import { logger } from "./logger";
 
 export const pool = new Pool({
   connectionString: config.POSTGRES_URL,
@@ -13,12 +13,12 @@ export const pool = new Pool({
   connectionTimeoutMillis: 5000,
 });
 
-pool.on('error', (err) => {
-  logger.error({ err }, 'Unexpected PostgreSQL pool error');
+pool.on("error", (err) => {
+  logger.error({ err }, "Unexpected PostgreSQL pool error");
 });
 
-pool.on('connect', () => {
-  logger.debug('New PostgreSQL client connected');
+pool.on("connect", () => {
+  logger.debug("New PostgreSQL client connected");
 });
 
 /**
@@ -26,13 +26,13 @@ pool.on('connect', () => {
  */
 export async function query<T = unknown>(
   text: string,
-  params?: unknown[]
+  params?: unknown[],
 ): Promise<T[]> {
   const start = Date.now();
   const result = await pool.query(text, params);
   const duration = Date.now() - start;
 
-  logger.debug({ text, duration, rows: result.rowCount }, 'Executed query');
+  logger.debug({ text, duration, rows: result.rowCount }, "Executed query");
 
   return result.rows as T[];
 }
@@ -48,16 +48,16 @@ export async function getClient(): Promise<PoolClient> {
  * Execute a function within a transaction
  */
 export async function withTransaction<T>(
-  fn: (client: PoolClient) => Promise<T>
+  fn: (client: PoolClient) => Promise<T>,
 ): Promise<T> {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
     const result = await fn(client);
-    await client.query('COMMIT');
+    await client.query("COMMIT");
     return result;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();
@@ -69,10 +69,10 @@ export async function withTransaction<T>(
  */
 export async function checkHealth(): Promise<boolean> {
   try {
-    await pool.query('SELECT 1');
+    await pool.query("SELECT 1");
     return true;
   } catch (error) {
-    logger.error({ error }, 'Database health check failed');
+    logger.error({ error }, "Database health check failed");
     return false;
   }
 }
@@ -82,5 +82,5 @@ export async function checkHealth(): Promise<boolean> {
  */
 export async function closePool(): Promise<void> {
   await pool.end();
-  logger.info('PostgreSQL pool closed');
+  logger.info("PostgreSQL pool closed");
 }

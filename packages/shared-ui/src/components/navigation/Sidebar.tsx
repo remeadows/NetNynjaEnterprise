@@ -64,7 +64,7 @@ export function Sidebar({
               onClick={onToggleCollapse}
               className={cn(
                 "rounded-md p-1.5 text-silver-400 hover:bg-dark-800 hover:text-primary-400",
-                collapsed && "mx-auto"
+                collapsed && "mx-auto",
               )}
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >

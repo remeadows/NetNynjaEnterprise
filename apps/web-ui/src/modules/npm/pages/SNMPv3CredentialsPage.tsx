@@ -65,7 +65,9 @@ export function SNMPv3CredentialsPage() {
   const [selectedCredential, setSelectedCredential] =
     useState<SNMPv3Credential | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [testResult, setTestResult] = useState<TestCredentialResult | null>(null);
+  const [testResult, setTestResult] = useState<TestCredentialResult | null>(
+    null,
+  );
   const [testError, setTestError] = useState<string | null>(null);
   const [testIp, setTestIp] = useState("");
   const [testPort, setTestPort] = useState("161");
@@ -145,9 +147,7 @@ export function SNMPv3CredentialsPage() {
       );
       setTestResult(result);
     } catch (err) {
-      setTestError(
-        err instanceof Error ? err.message : "Unknown error",
-      );
+      setTestError(err instanceof Error ? err.message : "Unknown error");
     }
   };
 
@@ -738,26 +738,56 @@ export function SNMPv3CredentialsPage() {
                     ) : (
                       <div className="text-green-800 dark:text-green-400">
                         <p className="font-medium flex items-center gap-2">
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
                           </svg>
                           Connection Successful
                         </p>
                         <div className="mt-3 space-y-2 text-sm">
                           {testResult.sysName && (
-                            <p><span className="font-medium">Device Name:</span> {testResult.sysName}</p>
+                            <p>
+                              <span className="font-medium">Device Name:</span>{" "}
+                              {testResult.sysName}
+                            </p>
                           )}
                           {testResult.sysDescr && (
-                            <p><span className="font-medium">Description:</span> {testResult.sysDescr}</p>
+                            <p>
+                              <span className="font-medium">Description:</span>{" "}
+                              {testResult.sysDescr}
+                            </p>
                           )}
                           {testResult.sysUptime !== undefined && (
-                            <p><span className="font-medium">Uptime:</span> {Math.floor(testResult.sysUptime / 86400)}d {Math.floor((testResult.sysUptime % 86400) / 3600)}h {Math.floor((testResult.sysUptime % 3600) / 60)}m</p>
+                            <p>
+                              <span className="font-medium">Uptime:</span>{" "}
+                              {Math.floor(testResult.sysUptime / 86400)}d{" "}
+                              {Math.floor(
+                                (testResult.sysUptime % 86400) / 3600,
+                              )}
+                              h {Math.floor((testResult.sysUptime % 3600) / 60)}
+                              m
+                            </p>
                           )}
                           {testResult.sysContact && (
-                            <p><span className="font-medium">Contact:</span> {testResult.sysContact}</p>
+                            <p>
+                              <span className="font-medium">Contact:</span>{" "}
+                              {testResult.sysContact}
+                            </p>
                           )}
                           {testResult.sysLocation && (
-                            <p><span className="font-medium">Location:</span> {testResult.sysLocation}</p>
+                            <p>
+                              <span className="font-medium">Location:</span>{" "}
+                              {testResult.sysLocation}
+                            </p>
                           )}
                           {testResult.responseTimeMs && (
                             <p className="text-xs opacity-75 pt-1">

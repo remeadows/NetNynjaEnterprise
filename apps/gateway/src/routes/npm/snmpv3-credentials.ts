@@ -669,20 +669,16 @@ const snmpv3CredentialsRoutes: FastifyPluginAsync = async (fastify) => {
       );
 
       // Perform actual SNMPv3 test
-      const testResult = await testSNMPv3Credential(
-        body.targetIp,
-        body.port,
-        {
-          username: credential.username,
-          securityLevel: credential.security_level,
-          authProtocol: credential.auth_protocol,
-          authPassword,
-          privProtocol: credential.priv_protocol,
-          privPassword,
-          contextName: credential.context_name,
-          contextEngineId: credential.context_engine_id,
-        },
-      );
+      const testResult = await testSNMPv3Credential(body.targetIp, body.port, {
+        username: credential.username,
+        securityLevel: credential.security_level,
+        authProtocol: credential.auth_protocol,
+        authPassword,
+        privProtocol: credential.priv_protocol,
+        privPassword,
+        contextName: credential.context_name,
+        contextEngineId: credential.context_engine_id,
+      });
 
       if (!testResult.success) {
         return {
