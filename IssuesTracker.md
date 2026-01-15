@@ -2,12 +2,13 @@
 
 > Active issues and technical debt tracking
 
-**Version**: 0.2.5
-**Last Updated**: 2026-01-15 15:15 EST
-**Stats**: 0 open | 1 deferred | 142 resolved (archived)
+**Version**: 0.2.6
+**Last Updated**: 2026-01-15 15:45 EST
+**Stats**: 0 open | 0 deferred | 143 resolved (archived)
 **Codex Review**: 2026-01-14 11:30 (E2E: READY, Security: Low)
-**Docker Scout**: 2026-01-15 (1 Critical, 8 High vulnerabilities identified)
+**Docker Scout**: 2026-01-15 (1 Critical, 5 High - 2 fixed via Vite 7 upgrade)
 **CI/CD Status**: PASS ✅ (2026-01-15)
+**npm audit**: 0 vulnerabilities ✅
 
 ---
 
@@ -17,7 +18,6 @@
 
 ## ⏭️ NEXT (Queued / Ready)
 
-- [ ] CI-012 — Upgrade Vite 5.x to 7.x (npm audit esbuild/vite moderate vulnerability) - Deferred
 - [ ] Phase 9 — Documentation site deployment (optional)
 
 ## ⛔ BLOCKED (Waiting / External Dependency)
@@ -32,14 +32,14 @@
 
 ### Current Vulnerabilities (Docker Scout Assessment)
 
-| Severity | CVE            | Package     | Fix Available       | Action           |
-| -------- | -------------- | ----------- | ------------------- | ---------------- |
-| Critical | CVE-2026-22184 | zlib        | ❌ No               | Monitor upstream |
-| High     | CVE-2024-21538 | cross-spawn | ✅ Yes (via Vite 7) | Scheduled        |
-| High     | CVE-2025-64756 | glob        | ✅ Yes (via Vite 7) | Scheduled        |
-| High     | CVE-2024-23342 | ecdsa       | ⏳ Pending          | Monitor          |
-| High     | CVE-2025-6020  | PAM         | ⏳ Pending          | Monitor          |
-| High     | CVE-2025-68973 | GnuPG       | ⏳ Pending          | Monitor          |
+| Severity | CVE            | Package     | Fix Available | Action            |
+| -------- | -------------- | ----------- | ------------- | ----------------- |
+| Critical | CVE-2026-22184 | zlib        | ❌ No         | Monitor upstream  |
+| High     | CVE-2024-21538 | cross-spawn | ✅ Fixed      | Vite 7 upgrade ✅ |
+| High     | CVE-2025-64756 | glob        | ✅ Fixed      | Vite 7 upgrade ✅ |
+| High     | CVE-2024-23342 | ecdsa       | ⏳ Pending    | Monitor           |
+| High     | CVE-2025-6020  | PAM         | ⏳ Pending    | Monitor           |
+| High     | CVE-2025-68973 | GnuPG       | ⏳ Pending    | Monitor           |
 
 ### Remediation Strategy
 
@@ -48,11 +48,12 @@
 - zlib CVE-2026-22184: Subscribe to Alpine Linux security announcements
 - Compensating control: Container network isolation, minimal attack surface
 
-**Tier 2: Scheduled Updates (CI-012)**
+**Tier 2: Completed ✅ (2026-01-15)**
 
-- cross-spawn, glob: Fixed by upgrading Vite 5.x → 7.x
-- Requires React 18 compatibility testing
-- Target: Next sprint after stability validation
+- cross-spawn, glob: Fixed by upgrading Vite 5.x → 7.3.1
+- @vitejs/plugin-react: 4.2.1 → 5.1.2
+- @types/node: 20.10.0 → 20.19.0
+- npm audit: 0 vulnerabilities
 
 **Tier 3: Rebuild on Upstream Fix**
 
@@ -61,8 +62,8 @@
 
 ### Monitoring Checklist
 
-- [ ] Subscribe to Alpine Linux security mailing list
-- [ ] Subscribe to Node.js security announcements
+- [x] Subscribe to Alpine Linux security mailing list - https://lists.alpinelinux.org/lists/~alpine/security-announce
+- [x] Subscribe to Node.js security announcements - https://nodejs.org/en/about/security
 - [ ] Set calendar reminder for weekly vulnerability review
 - [ ] Document risk acceptance for CVE-2026-22184 in security register
 
@@ -113,6 +114,7 @@ All issues from Codex Review 2026-01-14 have been resolved.
 
 | ID      | P   | Title                                   | Resolved   | Resolution                                            |
 | ------- | --- | --------------------------------------- | ---------- | ----------------------------------------------------- |
+| CI-012  | 🟠  | Vite 5.x to 7.x upgrade                 | 2026-01-15 | Upgraded Vite 7.3.1, fixed cross-spawn/glob CVEs      |
 | CI-015  | 🟠  | Tests workflow failing                  | 2026-01-15 | Added --passWithNoTests to Jest config                |
 | CI-016  | 🟡  | E2E cleanup step failing                | 2026-01-15 | Added fallback to docker compose down in CI           |
 | SEC-010 | 🟠  | Container security vulnerability scan   | 2026-01-15 | Docker Scout scan completed, report generated         |
