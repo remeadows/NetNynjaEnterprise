@@ -274,7 +274,7 @@ jobs:
         continue-on-error: true
 
       - name: Stop services
-        run: docker compose down -v
+        run: docker compose down -v || true
         if: always()
 
   # Summary
