@@ -215,7 +215,7 @@ li {
   </div>
 </div>
 
-<p class="timestamp"><strong>Document Generated:</strong> January 15, 2026 | <strong>Version:</strong> 0.2.3</p>
+<p class="timestamp"><strong>Document Generated:</strong> January 15, 2026 | <strong>Version:</strong> 0.2.5</p>
 
 <div class="ninja-accent"></div>
 
@@ -337,7 +337,7 @@ li {
     <div class="metric-label">Phases Complete</div>
   </div>
   <div class="metric-item">
-    <div class="metric-value" style="color: #166534;">130</div>
+    <div class="metric-value" style="color: #166534;">140</div>
     <div class="metric-label">Issues Resolved</div>
   </div>
   <div class="metric-item">
@@ -489,8 +489,8 @@ li {
 <div class="section-header">5. SECURITY REVIEW STATUS</div>
 
 <div class="highlight-box">
-  <strong>Current Security Posture: <span style="color: #166534; font-size: 14pt;">LOW RISK</span></strong><br/>
-  All findings from the most recent Codex security review (January 14, 2026) have been resolved.
+  <strong>Current Security Posture: <span style="color: #ca8a04; font-size: 14pt;">MEDIUM RISK</span></strong><br/>
+  All findings from the Codex security review (January 14, 2026) have been resolved. Docker Scout container vulnerability assessment (January 15, 2026) identified 1 Critical and 8 High severity vulnerabilities requiring remediation. All 14 container images have been cryptographically signed with Cosign for integrity verification.
 </div>
 
 <h3 class="subsection-header">Security Review Summary</h3>
@@ -507,6 +507,18 @@ li {
     <td>2026-01-14</td>
     <td>All findings resolved</td>
     <td><span class="status-badge status-low">LOW RISK</span></td>
+  </tr>
+  <tr>
+    <td>Docker Scout Vulnerability Scan</td>
+    <td>2026-01-15</td>
+    <td>1 Critical, 8 High vulnerabilities</td>
+    <td><span class="status-badge" style="background-color: #fef3c7; color: #854d0e;">MEDIUM RISK</span></td>
+  </tr>
+  <tr>
+    <td>Container Image Signing</td>
+    <td>2026-01-15</td>
+    <td>All 14 images signed with Cosign</td>
+    <td><span class="status-badge status-complete">IMPLEMENTED</span></td>
   </tr>
   <tr>
     <td>E2E Readiness Assessment</td>
@@ -541,7 +553,11 @@ li {
   </tr>
   <tr>
     <td>Container Security</td>
-    <td>Non-root users; Trivy scanning; pinned image versions (no :latest tags)</td>
+    <td>Non-root users; Docker Scout vulnerability scanning; pinned image versions; Cosign cryptographic signing</td>
+  </tr>
+  <tr>
+    <td>Software Integrity</td>
+    <td>All container images signed with Cosign (Sigstore); public key verification enabled; DoD RMF SI-7 compliance</td>
   </tr>
   <tr>
     <td>SNMPv3 Compliance</td>
@@ -556,9 +572,10 @@ li {
 <ul>
   <li><strong>Automated Code Analysis:</strong> Codex AI-powered security reviews analyzing codebase for vulnerabilities</li>
   <li><strong>Dependency Scanning:</strong> npm audit (Node.js) and safety check (Python) for known vulnerabilities</li>
-  <li><strong>Container Scanning:</strong> Trivy scans on all container images before deployment</li>
+  <li><strong>Container Scanning:</strong> Docker Scout vulnerability assessment for all container images (v1.19.0)</li>
+  <li><strong>Container Signing:</strong> Cosign cryptographic signatures on all production container images</li>
   <li><strong>CI/CD Security Gates:</strong> All pull requests require passing security scans before merge</li>
-  <li><strong>Issue Tracking:</strong> Dedicated IssuesTracker.md with priority-based remediation (0 open / 130 resolved)</li>
+  <li><strong>Issue Tracking:</strong> Dedicated IssuesTracker.md with priority-based remediation (0 open / 140 resolved)</li>
 </ul>
 
 <h3 class="subsection-header">Recently Resolved Security Findings</h3>
@@ -570,6 +587,20 @@ li {
     <th>Finding</th>
     <th>Resolution</th>
     <th>Date</th>
+  </tr>
+  <tr>
+    <td>SEC-010</td>
+    <td style="background-color: #fed7aa;">High</td>
+    <td>Container vulnerability scan</td>
+    <td>Docker Scout scan completed, report generated</td>
+    <td>2026-01-15</td>
+  </tr>
+  <tr>
+    <td>INFRA-8</td>
+    <td style="background-color: #fed7aa;">High</td>
+    <td>Container image signing</td>
+    <td>All 14 images signed with Cosign, pushed to GHCR</td>
+    <td>2026-01-15</td>
   </tr>
   <tr>
     <td>SEC-008</td>
@@ -592,20 +623,6 @@ li {
     <td>Verified .gitignore; .env.example exists</td>
     <td>2026-01-14</td>
   </tr>
-  <tr>
-    <td>SEC-005</td>
-    <td style="background-color: #d1fae5;">Low</td>
-    <td>Observability ports exposed</td>
-    <td>Bound to localhost only</td>
-    <td>2026-01-14</td>
-  </tr>
-  <tr>
-    <td>SEC-004</td>
-    <td style="background-color: #fef3c7;">Medium</td>
-    <td>STIG ZIP upload DoS limits</td>
-    <td>Already implemented (500 files, 100MB)</td>
-    <td>2026-01-14</td>
-  </tr>
 </table>
 
 <!-- Section 6: Project Information -->
@@ -622,7 +639,7 @@ li {
   </tr>
   <tr>
     <td><strong>Application Version</strong></td>
-    <td>0.2.3</td>
+    <td>0.2.5</td>
   </tr>
   <tr>
     <td><strong>Project Start Date</strong></td>
@@ -642,7 +659,7 @@ li {
   </tr>
   <tr>
     <td><strong>Security Posture</strong></td>
-    <td><span class="status-badge status-low">LOW RISK</span></td>
+    <td><span class="status-badge" style="background-color: #fef3c7; color: #854d0e;">MEDIUM RISK</span></td>
   </tr>
 </table>
 

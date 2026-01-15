@@ -3,9 +3,10 @@
 > Active issues and technical debt tracking
 
 **Version**: 0.2.4
-**Last Updated**: 2026-01-15
-**Stats**: 0 open | 1 deferred | 137 resolved (archived)
+**Last Updated**: 2026-01-15 11:45 EST
+**Stats**: 0 open | 1 deferred | 140 resolved (archived)
 **Codex Review**: 2026-01-14 11:30 (E2E: READY, Security: Low)
+**Docker Scout**: 2026-01-15 (1 Critical, 8 High vulnerabilities identified)
 
 ---
 
@@ -15,6 +16,7 @@
 
 ## ⏭️ NEXT (Queued / Ready)
 
+- [ ] SEC-011 — Implement Docker Scout remediation plan (Priority 1: Monitor zlib CVE-2026-22184, Priority 2: Update cross-spawn/glob)
 - [ ] CI-012 — Upgrade Vite 5.x to 7.x (npm audit esbuild/vite moderate vulnerability) - Deferred
 - [ ] Phase 9 — Documentation site deployment (optional)
 
@@ -69,6 +71,9 @@ All issues from Codex Review 2026-01-14 have been resolved.
 
 | ID      | P   | Title                                   | Resolved   | Resolution                                            |
 | ------- | --- | --------------------------------------- | ---------- | ----------------------------------------------------- |
+| SEC-010 | 🟠  | Container security vulnerability scan   | 2026-01-15 | Docker Scout scan completed, report generated         |
+| DOC-003 | 🟢  | Code signing implementation guide       | 2026-01-15 | Created CODE_SIGNING_GUIDE.md with Cosign/GPG docs    |
+| INFRA-8 | 🟠  | Container image signing and publishing  | 2026-01-15 | All 14 images signed with Cosign, pushed to GHCR      |
 | UI-016  | 🟢  | ISSO Executive Summary document         | 2026-01-15 | Created HTML/Word doc with project overview for ISSO  |
 | UI-015  | 🟡  | Subtitle text illegible on dark bg      | 2026-01-15 | Brighter colors + text-shadow for gray-400/500        |
 | UI-014  | 🟢  | Add condensed display density           | 2026-01-15 | Added "Condensed" option with 9-15px fonts            |
