@@ -3,21 +3,46 @@
 > Active issues and technical debt tracking
 
 **Version**: 0.2.6
-**Last Updated**: 2026-01-15 15:45 EST
-**Stats**: 0 open | 0 deferred | 143 resolved (archived)
-**Codex Review**: 2026-01-14 11:30 (E2E: READY, Security: Low)
+**Last Updated**: 2026-01-15 16:30 EST
+**Stats**: 3 open | 1 deferred | 143 resolved (archived)
+**Codex Review**: 2026-01-15 16:05 (E2E: BLOCKED, Security: Low, CI: At-Risk)
 **Docker Scout**: 2026-01-15 (1 Critical, 5 High - 2 fixed via Vite 7 upgrade)
-**CI/CD Status**: PASS ✅ (2026-01-15)
+**CI/CD Status**: AT RISK ⚠️ (Turbo TLS/keychain error)
 **npm audit**: 0 vulnerabilities ✅
 
 ---
 
 ## 🔥 NOW (Active / In Progress)
 
-(none - all security issues resolved)
+| ID      | P   | Title                               | Status | Owner  |
+| ------- | --- | ----------------------------------- | ------ | ------ |
+| APP-016 | 🔴  | Syslog forwarder crash (missing DB) | Open   | DevOps |
+| CI-017  | 🔴  | Turbo APIClient TLS/keychain error  | Open   | DevOps |
+| APP-017 | 🟠  | E2E tests blocked by artifacts      | Open   | DevOps |
+
+### APP-016: Syslog Forwarder Crash
+
+**Description**: `netnynja-syslog-forwarder` continuously restarts due to missing `syslog.forwarders` table.
+**Evidence**: `asyncpg.exceptions.UndefinedTableError: relation "syslog.forwarders" does not exist`
+**Resolution**: Apply missing migration or create table, then restart service.
+
+### CI-017: Turbo APIClient TLS/Keychain Error
+
+**Description**: All Turbo-based npm scripts (`lint`, `typecheck`, `test`, `build`) fail with TLS error.
+**Evidence**: `Failed to create APIClient: Unable to set up TLS. No keychain is available.`
+**Resolution**: Disable Turbo remote cache or fix keychain/TLS access configuration.
+
+### APP-017: E2E Tests Blocked
+
+**Description**: E2E test suite cannot run due to artifact creation constraints.
+**Evidence**: `tests/e2e/run_tests.sh` creates `.venv` and `tests/e2e/reports/*` directories.
+**Resolution**: Approve E2E artifacts or run in disposable environment.
 
 ## ⏭️ NEXT (Queued / Ready)
 
+- [ ] Seed E2E users in `shared.users` table
+- [ ] Validate VictoriaMetrics write endpoint (preflight warning)
+- [ ] Verify NATS stream endpoint JSON format for monitoring
 - [ ] Phase 9 — Documentation site deployment (optional)
 
 ## ⛔ BLOCKED (Waiting / External Dependency)
@@ -151,9 +176,7 @@ All issues from Codex Review 2026-01-14 have been resolved.
 
 ## 🗄️ Deferred Issues
 
-| ID     | P   | Title                   | Reason                                            | Target        |
-| ------ | --- | ----------------------- | ------------------------------------------------- | ------------- |
-| CI-012 | 🟡  | Upgrade Vite 5.x to 7.x | Major version bump, needs React 18 compat testing | Future sprint |
+(none - CI-012 Vite upgrade completed 2026-01-15)
 
 ---
 
