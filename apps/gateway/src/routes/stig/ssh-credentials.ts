@@ -156,34 +156,44 @@ const sshCredentialsRoutes: FastifyPluginAsync = async (fastify) => {
       const userId = request.user?.sub;
 
       // Always filter by current user (user isolation)
-      const conditions: string[] = [`created_by = $3`];
-      const params: unknown[] = [query.limit, offset, userId];
-      let paramIndex = 4;
+      // Build conditions with separate param tracking for count vs data queries
+      const dataConditions: string[] = [`created_by = $3`];
+      const countConditions: string[] = [`created_by = $1`];
+      const dataParams: unknown[] = [query.limit, offset, userId];
+      const countParams: unknown[] = [userId];
+      let dataParamIndex = 4;
+      let countParamIndex = 2;
 
       if (query.search) {
-        conditions.push(
-          `(name ILIKE $${paramIndex} OR username ILIKE $${paramIndex})`,
+        dataConditions.push(
+          `(name ILIKE $${dataParamIndex} OR username ILIKE $${dataParamIndex})`,
         );
-        params.push(`%${query.search}%`);
-        paramIndex++;
+        countConditions.push(
+          `(name ILIKE $${countParamIndex} OR username ILIKE $${countParamIndex})`,
+        );
+        dataParams.push(`%${query.search}%`);
+        countParams.push(`%${query.search}%`);
+        dataParamIndex++;
+        countParamIndex++;
       }
 
-      const whereClause = `WHERE ${conditions.join(" AND ")}`;
+      const dataWhereClause = `WHERE ${dataConditions.join(" AND ")}`;
+      const countWhereClause = `WHERE ${countConditions.join(" AND ")}`;
 
-      const countQuery = `SELECT COUNT(*) FROM stig.ssh_credentials ${whereClause}`;
+      const countQuery = `SELECT COUNT(*) FROM stig.ssh_credentials ${countWhereClause}`;
       const dataQuery = `
       SELECT id, name, description, username, auth_type, default_port,
              sudo_enabled, sudo_method, sudo_user,
              created_by, created_at, updated_at
       FROM stig.ssh_credentials
-      ${whereClause}
+      ${dataWhereClause}
       ORDER BY name
       LIMIT $1 OFFSET $2
     `;
 
       const [countResult, dataResult] = await Promise.all([
-        pool.query(countQuery, params.slice(2)),
-        pool.query(dataQuery, params),
+        pool.query(countQuery, countParams),
+        pool.query(dataQuery, dataParams),
       ]);
 
       return {

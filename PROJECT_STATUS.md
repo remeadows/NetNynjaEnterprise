@@ -1,10 +1,10 @@
 # NetNynja Enterprise - Project Status
 
 **Version**: 0.2.9
-**Last Updated**: 2026-01-16 15:45 EST
+**Last Updated**: 2026-01-16 20:15 EST
 **Current Phase**: Phase 9 - CI/CD & Release (Complete)
 **Overall Progress**: ▓▓▓▓▓▓▓▓▓▓ 100%
-**Issues**: 0 Open | 149 Resolved | 1 Deferred
+**Issues**: 0 Open | 152 Resolved | 1 Deferred
 **Security Posture**: Medium (Docker Scout: 1 Critical, 3 High | npm audit: 0 vulnerabilities ✅)
 **Container Security**: All 14 images cryptographically signed with Cosign ✅
 **Release Status**: v0.2.9 Ready (CI: PENDING)
@@ -274,7 +274,23 @@ Library Stats (October 2025):
 
 ### [Unreleased]
 
-(No unreleased changes)
+**Gateway-to-STIG Service Proxy Routes**
+
+Fixes:
+
+- Added STIG_SERVICE_URL config to gateway for Python STIG service communication
+- Added audit proxy routes: /api/v1/stig/audits/\* forwarded to STIG service
+- Added config analysis proxy route: /api/v1/stig/targets/{id}/analyze-config
+- Fixed frontend 401 Unauthorized for config analysis (missing auth header)
+- Added form-data package for multipart file forwarding
+
+Files Modified:
+
+- apps/gateway/src/config.ts - Added STIG_SERVICE_URL
+- apps/gateway/src/routes/stig/index.ts - Added targetRoutes & auditRoutes plugins
+- apps/gateway/package.json - Added form-data dependency
+- apps/web-ui/src/modules/stig/pages/AssetsPage.tsx - Use api client with auth
+- docker-compose.yml - Added STIG_SERVICE_URL env var to gateway
 
 ---
 

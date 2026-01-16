@@ -267,6 +267,7 @@ services:
       VAULT_TOKEN: ${VAULT_DEV_TOKEN:-netnynja-dev-token}
       JAEGER_ENDPOINT: http://jaeger:4318/v1/traces
       AUTH_SERVICE_URL: http://auth-service:3006
+      STIG_SERVICE_URL: http://stig-service:3005
       JWT_SECRET: ${JWT_SECRET:-netnynja-dev-jwt-secret-2025}
       CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-netnynja-dev-encryption-key-32ch}
       # Rate limiting - relaxed for development/E2E testing

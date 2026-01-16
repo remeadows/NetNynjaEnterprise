@@ -3,8 +3,8 @@
 > Active issues and technical debt tracking
 
 **Version**: 0.2.9
-**Last Updated**: 2026-01-16 15:45 EST
-**Stats**: 0 open | 1 deferred | 149 resolved (archived)
+**Last Updated**: 2026-01-16 20:15 EST
+**Stats**: 0 open | 1 deferred | 152 resolved (archived)
 **Codex Review**: 2026-01-16 (E2E: FIXED, Security: Low, CI: PASS ✅)
 **Docker Scout**: 2026-01-15 (1 Critical, 3 High - 2 fixed via Vite 7 upgrade)
 **CI/CD Status**: PENDING
@@ -117,6 +117,9 @@ All issues from Codex Review 2026-01-14 have been resolved.
 
 | ID      | P   | Title                                   | Resolved   | Resolution                                            |
 | ------- | --- | --------------------------------------- | ---------- | ----------------------------------------------------- |
+| STIG-11 | 🟠  | Config analysis 401 Unauthorized        | 2026-01-16 | Fixed frontend to use api client with auth header     |
+| STIG-10 | 🟠  | Config analysis 404 gateway route       | 2026-01-16 | Added proxy route in gateway for STIG service         |
+| STIG-09 | 🟠  | SSH audit endpoint proxy missing        | 2026-01-16 | Added audit routes proxy to gateway (STIG service)    |
 | STIG-08 | 🟠  | STIG Library XCCDF indexer              | 2026-01-16 | Created library module: catalog, parser, indexer      |
 | STIG-07 | 🟠  | STIG Library API endpoints              | 2026-01-16 | Added 6 API endpoints for browsing/searching library  |
 | STIG-06 | 🟠  | Config file analysis feature            | 2026-01-16 | Added parsers for 6 platforms, API endpoint, UI modal |

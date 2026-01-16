@@ -70,6 +70,7 @@ const ConfigSchema = z.object({
 
   // Backend Services
   AUTH_SERVICE_URL: z.string().default("http://localhost:3006"),
+  STIG_SERVICE_URL: z.string().default("http://localhost:3005"),
 
   // Encryption - MUST be set via environment variable in production (min 32 chars)
   CREDENTIAL_ENCRYPTION_KEY: z.string().min(32),

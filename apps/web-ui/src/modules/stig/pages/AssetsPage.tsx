@@ -12,6 +12,7 @@ import {
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Target } from "@netnynja/shared-types";
 import { useSTIGStore } from "../../../stores/stig";
+import { api } from "../../../lib/api";
 
 // Extended Target type to include credential info from API
 interface TargetWithCredential extends Target {
@@ -266,13 +267,19 @@ export function STIGAssetsPage() {
 
   const handleStartAudit = async () => {
     if (!selectedAsset || !selectedBenchmarkId) return;
-    // For now, show a message - actual audit execution would be via Python service
-    alert(
-      `Audit requested for ${selectedAsset.name} using benchmark ${selectedBenchmarkId}.\n\nNote: Actual audit execution requires the STIG audit service.`,
-    );
-    setShowAuditModal(false);
-    setSelectedAsset(null);
-    setSelectedBenchmarkId("");
+    try {
+      const { startAudit } = useSTIGStore.getState();
+      const auditJob = await startAudit(selectedAsset.id, selectedBenchmarkId);
+      setShowAuditModal(false);
+      setSelectedAsset(null);
+      setSelectedBenchmarkId("");
+      alert(
+        `Audit started successfully!\n\nJob ID: ${auditJob.id}\nStatus: ${auditJob.status}`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to start audit";
+      alert(`Error starting audit: ${message}`);
+    }
   };
 
   const openConfigModal = (asset: TargetWithCredential) => {
@@ -311,20 +318,17 @@ export function STIGAssetsPage() {
       formData.append("config_file", configFile);
       formData.append("definition_id", selectedBenchmarkId);
 
-      const response = await fetch(
+      const response = await api.post(
         `/api/v1/stig/targets/${selectedAsset.id}/analyze-config`,
+        formData,
         {
-          method: "POST",
-          body: formData,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
         },
       );
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Analysis failed");
-      }
-
-      const data = await response.json();
+      const data = response.data;
       setConfigAnalysisResults({
         totalChecks: data.data.total_checks,
         passed: data.data.summary?.passed || 0,
@@ -336,9 +340,8 @@ export function STIGAssetsPage() {
       // Refresh targets to show updated last audit
       fetchTargets();
     } catch (error) {
-      alert(
-        `Configuration analysis failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
+      const message = error instanceof Error ? error.message : "Unknown error";
+      alert(`Configuration analysis failed: ${message}`);
     } finally {
       setIsAnalyzing(false);
     }

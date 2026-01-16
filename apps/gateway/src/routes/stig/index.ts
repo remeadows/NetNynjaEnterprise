@@ -253,6 +253,12 @@ const stigRoutes: FastifyPluginAsync = async (fastify) => {
   // Register SSH credentials routes
   fastify.register(sshCredentialsRoutes, { prefix: "/ssh-credentials" });
 
+  // Register audit routes (proxy to STIG service)
+  fastify.register(auditRoutes, { prefix: "/audits" });
+
+  // Register target routes (config analysis proxied to STIG service)
+  fastify.register(targetRoutes, { prefix: "/targets" });
+
   // List STIG definitions (benchmarks)
   fastify.get(
     "/benchmarks",
@@ -1692,6 +1698,464 @@ const stigRoutes: FastifyPluginAsync = async (fastify) => {
           ),
         },
       };
+    },
+  );
+};
+
+// =============================================================================
+// Audit Routes (Proxy to STIG Service)
+// =============================================================================
+
+const auditJobSchema = z.object({
+  targetId: z.string().uuid(),
+  definitionId: z.string().uuid().optional(),
+  name: z.string().max(255).optional(),
+});
+
+async function proxyToSTIGService(
+  method: string,
+  path: string,
+  token: string,
+  body?: unknown,
+): Promise<{ status: number; data: unknown }> {
+  const { config } = await import("../../config");
+
+  const url = `${config.STIG_SERVICE_URL}${path}`;
+  const options: RequestInit = {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  };
+
+  if (body && method !== "GET") {
+    options.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(url, options);
+  const data = await response.json();
+
+  return { status: response.status, data };
+}
+
+// Helper to extract token from request
+function getTokenFromRequest(request: FastifyRequest): string | null {
+  const auth = request.headers.authorization;
+  if (auth?.startsWith("Bearer ")) {
+    return auth.substring(7);
+  }
+  return null;
+}
+
+// =============================================================================
+// Target Configuration Analysis Routes (Proxy to STIG Service)
+// =============================================================================
+
+const targetRoutes: FastifyPluginAsync = async (fastify) => {
+  // Analyze target configuration file
+  fastify.post(
+    "/:targetId/analyze-config",
+    {
+      schema: {
+        tags: ["STIG - Configuration Analysis"],
+        summary: "Analyze configuration file against STIG",
+        security: [{ bearerAuth: [] }],
+        consumes: ["multipart/form-data"],
+        params: {
+          type: "object",
+          properties: {
+            targetId: { type: "string", format: "uuid" },
+          },
+          required: ["targetId"],
+        },
+      },
+      preHandler: [fastify.requireAuth, fastify.requireRole("admin", "operator")],
+    },
+    async (request, reply) => {
+      const token = getTokenFromRequest(request);
+      if (!token) {
+        reply.status(401);
+        return { success: false, error: { code: "UNAUTHORIZED", message: "Missing token" } };
+      }
+
+      const { targetId } = request.params as { targetId: string };
+
+      try {
+        // Get multipart data from request
+        const data = await request.file();
+        if (!data) {
+          reply.status(400);
+          return {
+            success: false,
+            error: { code: "NO_FILE", message: "No configuration file uploaded" },
+          };
+        }
+
+        // Read file content
+        const chunks: Buffer[] = [];
+        for await (const chunk of data.file) {
+          chunks.push(chunk as Buffer);
+        }
+        const fileBuffer = Buffer.concat(chunks);
+
+        // Get definition_id from form fields
+        const fields = data.fields as Record<string, { value: string }>;
+        const definitionId = fields.definition_id?.value;
+
+        if (!definitionId) {
+          reply.status(400);
+          return {
+            success: false,
+            error: { code: "MISSING_FIELD", message: "definition_id is required" },
+          };
+        }
+
+        // Forward to STIG service as multipart form
+        const { config } = await import("../../config");
+        const url = `${config.STIG_SERVICE_URL}/api/v1/stig/targets/${targetId}/analyze-config`;
+
+        // Create FormData for the forwarded request
+        const FormData = (await import("form-data")).default;
+        const form = new FormData();
+        form.append("config_file", fileBuffer, {
+          filename: data.filename,
+          contentType: data.mimetype,
+        });
+        form.append("definition_id", definitionId);
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...form.getHeaders(),
+          },
+          body: form as unknown as BodyInit,
+        });
+
+        const responseData = await response.json();
+        reply.status(response.status);
+        return responseData;
+      } catch (err) {
+        logger.error({ err }, "Failed to proxy config analysis to STIG service");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+};
+
+// Register audit routes in the stigRoutes function
+const auditRoutes: FastifyPluginAsync = async (fastify) => {
+  // List audit jobs
+  fastify.get(
+    "/",
+    {
+      schema: {
+        tags: ["STIG - Audits"],
+        summary: "List audit jobs",
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: "object",
+          properties: {
+            page: { type: "number", minimum: 1, default: 1 },
+            limit: { type: "number", minimum: 1, maximum: 100, default: 20 },
+            targetId: { type: "string", format: "uuid" },
+            status: { type: "string" },
+          },
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const token = getTokenFromRequest(request);
+      if (!token) {
+        reply.status(401);
+        return { success: false, error: { code: "UNAUTHORIZED", message: "Missing token" } };
+      }
+
+      const query = request.query as Record<string, string | number>;
+      const params = new URLSearchParams();
+      if (query.page) params.append("page", String(query.page));
+      if (query.limit) params.append("per_page", String(query.limit));
+      if (query.targetId) params.append("target_id", String(query.targetId));
+      if (query.status) params.append("status", String(query.status));
+
+      try {
+        const result = await proxyToSTIGService(
+          "GET",
+          `/api/v1/stig/audits?${params.toString()}`,
+          token,
+        );
+        reply.status(result.status);
+        return result.data;
+      } catch (err) {
+        logger.error({ err }, "Failed to proxy to STIG service");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
+  // Start a new audit
+  fastify.post(
+    "/",
+    {
+      schema: {
+        tags: ["STIG - Audits"],
+        summary: "Start a new STIG audit",
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: "object",
+          required: ["targetId"],
+          properties: {
+            targetId: { type: "string", format: "uuid" },
+            definitionId: { type: "string", format: "uuid" },
+            name: { type: "string" },
+          },
+        },
+      },
+      preHandler: [fastify.requireAuth, fastify.requireRole("admin", "operator")],
+    },
+    async (request, reply) => {
+      const token = getTokenFromRequest(request);
+      if (!token) {
+        reply.status(401);
+        return { success: false, error: { code: "UNAUTHORIZED", message: "Missing token" } };
+      }
+
+      const body = auditJobSchema.parse(request.body);
+
+      // Convert camelCase to snake_case for Python service
+      const pythonBody = {
+        target_id: body.targetId,
+        definition_id: body.definitionId,
+        name: body.name,
+      };
+
+      try {
+        const result = await proxyToSTIGService(
+          "POST",
+          "/api/v1/stig/audits",
+          token,
+          pythonBody,
+        );
+        reply.status(result.status);
+        return result.data;
+      } catch (err) {
+        logger.error({ err }, "Failed to proxy audit request to STIG service");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
+  // Get a specific audit job
+  fastify.get(
+    "/:jobId",
+    {
+      schema: {
+        tags: ["STIG - Audits"],
+        summary: "Get audit job by ID",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            jobId: { type: "string", format: "uuid" },
+          },
+          required: ["jobId"],
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const token = getTokenFromRequest(request);
+      if (!token) {
+        reply.status(401);
+        return { success: false, error: { code: "UNAUTHORIZED", message: "Missing token" } };
+      }
+
+      const { jobId } = request.params as { jobId: string };
+
+      try {
+        const result = await proxyToSTIGService(
+          "GET",
+          `/api/v1/stig/audits/${jobId}`,
+          token,
+        );
+        reply.status(result.status);
+        return result.data;
+      } catch (err) {
+        logger.error({ err }, "Failed to proxy to STIG service");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
+  // Cancel an audit
+  fastify.post(
+    "/:jobId/cancel",
+    {
+      schema: {
+        tags: ["STIG - Audits"],
+        summary: "Cancel a running audit",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            jobId: { type: "string", format: "uuid" },
+          },
+          required: ["jobId"],
+        },
+      },
+      preHandler: [fastify.requireAuth, fastify.requireRole("admin", "operator")],
+    },
+    async (request, reply) => {
+      const token = getTokenFromRequest(request);
+      if (!token) {
+        reply.status(401);
+        return { success: false, error: { code: "UNAUTHORIZED", message: "Missing token" } };
+      }
+
+      const { jobId } = request.params as { jobId: string };
+
+      try {
+        const result = await proxyToSTIGService(
+          "POST",
+          `/api/v1/stig/audits/${jobId}/cancel`,
+          token,
+        );
+        reply.status(result.status);
+        return result.data;
+      } catch (err) {
+        logger.error({ err }, "Failed to proxy to STIG service");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
+  // Get audit results
+  fastify.get(
+    "/:jobId/results",
+    {
+      schema: {
+        tags: ["STIG - Audits"],
+        summary: "Get results for an audit job",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            jobId: { type: "string", format: "uuid" },
+          },
+          required: ["jobId"],
+        },
+        querystring: {
+          type: "object",
+          properties: {
+            page: { type: "number", minimum: 1, default: 1 },
+            limit: { type: "number", minimum: 1, maximum: 100, default: 50 },
+            status: { type: "string" },
+            severity: { type: "string" },
+          },
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const token = getTokenFromRequest(request);
+      if (!token) {
+        reply.status(401);
+        return { success: false, error: { code: "UNAUTHORIZED", message: "Missing token" } };
+      }
+
+      const { jobId } = request.params as { jobId: string };
+      const query = request.query as Record<string, string | number>;
+
+      const params = new URLSearchParams();
+      if (query.page) params.append("page", String(query.page));
+      if (query.limit) params.append("per_page", String(query.limit));
+      if (query.status) params.append("status", String(query.status));
+      if (query.severity) params.append("severity", String(query.severity));
+
+      try {
+        const result = await proxyToSTIGService(
+          "GET",
+          `/api/v1/stig/audits/${jobId}/results?${params.toString()}`,
+          token,
+        );
+        reply.status(result.status);
+        return result.data;
+      } catch (err) {
+        logger.error({ err }, "Failed to proxy to STIG service");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
+  // Get audit summary
+  fastify.get(
+    "/:jobId/summary",
+    {
+      schema: {
+        tags: ["STIG - Audits"],
+        summary: "Get compliance summary for an audit",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            jobId: { type: "string", format: "uuid" },
+          },
+          required: ["jobId"],
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const token = getTokenFromRequest(request);
+      if (!token) {
+        reply.status(401);
+        return { success: false, error: { code: "UNAUTHORIZED", message: "Missing token" } };
+      }
+
+      const { jobId } = request.params as { jobId: string };
+
+      try {
+        const result = await proxyToSTIGService(
+          "GET",
+          `/api/v1/stig/audits/${jobId}/summary`,
+          token,
+        );
+        reply.status(result.status);
+        return result.data;
+      } catch (err) {
+        logger.error({ err }, "Failed to proxy to STIG service");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
     },
   );
 };
