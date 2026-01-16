@@ -12,6 +12,7 @@ from .core.logging import configure_logging, get_logger
 from .db.connection import init_db, close_db
 from .api import router, health_router
 from .services.audit import AuditService
+from .library import initialize_library
 
 configure_logging()
 logger = get_logger(__name__)
@@ -42,6 +43,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.warning("nats_connection_skipped", error=str(e))
         audit_service = AuditService()  # Without NATS
+
+    # Initialize STIG Library if path is configured
+    if settings.stig_library_path:
+        try:
+            logger.info(
+                "initializing_stig_library",
+                library_path=settings.stig_library_path,
+            )
+            catalog = initialize_library(settings.stig_library_path)
+            logger.info(
+                "stig_library_initialized",
+                total_entries=len(catalog),
+            )
+        except Exception as e:
+            logger.warning("stig_library_init_failed", error=str(e))
+    else:
+        logger.info("stig_library_path_not_configured")
 
     yield
 

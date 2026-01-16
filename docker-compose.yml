@@ -564,9 +564,11 @@ services:
       JWT_SECRET: ${JWT_SECRET:-netnynja-dev-jwt-secret-2025}
       REPORT_OUTPUT_DIR: /app/output
       LOG_LEVEL: DEBUG
+      STIG_LIBRARY_PATH: /app/stig-library
     volumes:
       - ./apps/stig/src:/app/src:ro
       - stig_reports:/app/output
+      - ./STIG/Library/U_SRG-STIG_Library_October_2025:/app/stig-library:ro
     ports:
       - "3005:3005"
     depends_on:

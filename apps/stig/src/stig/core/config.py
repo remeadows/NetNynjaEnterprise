@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     report_output_dir: str = Field(default="/app/output", alias="REPORT_OUTPUT_DIR")
     report_template_dir: str = Field(default="/app/templates", alias="REPORT_TEMPLATE_DIR")
 
+    # STIG Library settings
+    stig_library_path: str | None = Field(default=None, alias="STIG_LIBRARY_PATH")
+
     @property
     def is_development(self) -> bool:
         """Check if running in development mode."""
