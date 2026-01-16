@@ -16,6 +16,7 @@ dependencies = [
     "pydantic-settings>=2.1.0",
     "python-jose[cryptography]>=3.3.0",
     "httpx>=0.26.0",
+    "python-multipart>=0.0.6",
     "nats-py>=2.6.0",
     "structlog>=24.1.0",
     # SSH/Device connectivity
