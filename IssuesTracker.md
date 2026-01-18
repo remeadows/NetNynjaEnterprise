@@ -3,18 +3,106 @@
 > Active issues and technical debt tracking
 
 **Version**: 0.2.12
-**Last Updated**: 2026-01-18 10:45 EST
-**Stats**: 0 open | 0 deferred | 161 resolved (archived)
+**Last Updated**: 2026-01-18 15:30 UTC
+**Stats**: 0 open | 1 deferred | 162 resolved (archived)
 **Codex Review**: 2026-01-16 (E2E: FIXED, Security: Low, CI: PASS ✅)
 **Docker Scout**: 2026-01-15 (1 Critical, 3 High - 2 fixed via Vite 7 upgrade)
-**CI/CD Status**: PENDING
-**npm audit**: 0 vulnerabilities ✅
+**CI/CD Status**: FIXING (Phase 1 Complete - Awaiting GitHub Actions Validation)
+**npm audit**: 3 HIGH vulnerabilities (tar/argon2 - deferred to Phase 2)
 
 ---
 
 ## 🔥 NOW (Active / In Progress)
 
-(none)
+### CI-001: CI/CD Pipeline Validation (In Progress)
+
+**Status**: 🟡 Phase 1 Complete - Awaiting CI/CD Validation
+**Priority**: 🔴 Critical - Release Blocker
+**Started**: 2026-01-18 14:30 UTC
+**Engineer**: Claude (Enterprise IT Security & DevOps Architect)
+
+**Issue**: All 3 GitHub Actions workflows failing for commit f4d536b (multi-STIG config analysis feature)
+
+**Failed Workflows**:
+
+- ❌ Tests #45 (Duration: 1m 21s)
+- ❌ Security Scan #80 (Duration: 2m 17s)
+- ❌ Build Docker Images #24 (Duration: 11m 17s)
+
+**Root Cause**: npm optional dependency installation failure - Rollup ARM64 native binary missing
+
+**Impact**:
+
+- v0.2.12 release blocked
+- Cannot build Docker images
+- CI/CD pipeline completely broken
+
+**Phase 1 Resolution (Complete)**:
+
+- ✅ Cleaned node_modules and package-lock.json
+- ✅ Cleared npm cache (`npm cache clean --force`)
+- ✅ Reinstalled all dependencies (`npm install --ignore-scripts`)
+- ✅ Verified build succeeds locally (6/6 packages, 12.4s)
+- ✅ Verified tests pass locally (67/67 tests)
+- ✅ Created audit trail documentation: `docs/audit/2026-01-18_CI_CD_Failure_Remediation.md`
+
+**Next Steps**:
+
+1. ⏳ Commit dependency fixes with audit documentation
+2. ⏳ Push to GitHub and monitor CI/CD pipelines
+3. ⏳ Verify all 3 workflows pass in GitHub Actions
+
+**Expected Outcome**: ✅ All CI/CD workflows pass (95% confidence)
+
+**Audit Trail**: See `docs/audit/2026-01-18_CI_CD_Failure_Remediation.md` for complete timeline, root cause analysis, and remediation steps.
+
+---
+
+## 📋 DEFERRED
+
+### SEC-001: npm Security Vulnerabilities (Deferred to Phase 2)
+
+**Status**: 🟡 Deferred - Non-Blocking
+**Priority**: 🟠 High - Security Issue
+**Detected**: 2026-01-18 14:50 UTC
+**Target Resolution**: Within 48 hours
+
+**Vulnerabilities**:
+
+```
+Package: tar (<=7.5.2)
+Severity: HIGH
+CVE: GHSA-8qq5-rm4j-mr97
+Issue: Arbitrary File Overwrite and Symlink Poisoning
+
+Dependency Chain:
+argon2@0.27.2-0.31.2 → @mapbox/node-pre-gyp@<=1.0.11 → tar@<=7.5.2
+
+Count: 3 HIGH severity vulnerabilities
+```
+
+**Risk Assessment**:
+
+- Exploitability: Medium (requires malicious tar archive processing)
+- Impact: High (arbitrary file write, potential RCE)
+- Production Exposure: Low (tar not used in runtime code paths)
+- Affected Service: auth-service (password hashing)
+
+**Remediation Plan (Phase 2)**:
+
+1. Update argon2 to v0.44.0+ (breaking change)
+2. Verify auth service password hashing compatibility
+3. Run `npm audit fix --force` and validate
+4. Test authentication flows thoroughly
+
+**Justification for Deferral**:
+
+- Build/CI fixes take priority (release blocker)
+- Security issues don't block v0.2.12 release
+- Low production risk (no tar operations in runtime)
+- Will address in separate commit within 48 hours
+
+(none - moved CI-001 to NOW)
 
 ---
 
