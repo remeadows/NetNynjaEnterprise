@@ -34,6 +34,20 @@ from .report import (
     CKLVuln,
 )
 from .dashboard import STIGDashboard, TargetCompliance, WorstFinding, ComplianceTrend
+from .assignment import (
+    TargetDefinition,
+    TargetDefinitionBase,
+    TargetDefinitionCreate,
+    TargetDefinitionUpdate,
+    TargetDefinitionWithCompliance,
+    AuditGroup,
+    AuditGroupBase,
+    AuditGroupCreate,
+    AuditGroupWithJobs,
+    AuditGroupSummary,
+    BulkAssignmentRequest,
+    BulkAssignmentResponse,
+)
 
 __all__ = [
     # Common
@@ -73,4 +87,17 @@ __all__ = [
     "TargetCompliance",
     "WorstFinding",
     "ComplianceTrend",
+    # Assignment (Multi-STIG)
+    "TargetDefinition",
+    "TargetDefinitionBase",
+    "TargetDefinitionCreate",
+    "TargetDefinitionUpdate",
+    "TargetDefinitionWithCompliance",
+    "AuditGroup",
+    "AuditGroupBase",
+    "AuditGroupCreate",
+    "AuditGroupWithJobs",
+    "AuditGroupSummary",
+    "BulkAssignmentRequest",
+    "BulkAssignmentResponse",
 ]

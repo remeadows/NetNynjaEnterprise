@@ -15,6 +15,10 @@ from ..collectors.config_analyzer import (
     get_parser,
     detect_platform_from_content,
 )
+from ..collectors.juniper_stig_checker import (
+    analyze_juniper_config,
+    JuniperConfigParser,
+)
 from ..models import (
     Platform,
     STIGDefinition,
@@ -443,6 +447,7 @@ class ConfigComplianceChecker:
         definition: STIGDefinition | None = None,
         job_id: str = "",
         benchmark_id: str | None = None,
+        db_rules: list[dict] | None = None,
     ) -> list[AuditResultCreate]:
         """Analyze a configuration file against STIG rules.
 
@@ -452,11 +457,18 @@ class ConfigComplianceChecker:
             definition: Optional STIG definition with custom rules
             job_id: The audit job ID
             benchmark_id: Optional STIG Library benchmark ID to use
+            db_rules: Optional list of rules from database (definition_rules table)
 
         Returns:
             List of audit results from the analysis
         """
         results: list[AuditResultCreate] = []
+
+        # For Juniper platforms, use the enhanced Juniper STIG checker
+        if platform in (Platform.JUNIPER_JUNOS, Platform.JUNIPER_SRX):
+            return await self._analyze_juniper_config(
+                content, platform, definition, job_id, benchmark_id, db_rules
+            )
 
         # Get parser for platform
         parser = get_parser(platform)
@@ -504,18 +516,23 @@ class ConfigComplianceChecker:
             result = self._run_check(check, config, job_id)
             results.append(result)
 
-        # If a benchmark_id is provided, load XCCDF rules from the Library
-        xccdf_rules: list[XCCDFRule] = []
-        if benchmark_id:
-            xccdf_rules = self._get_xccdf_rules(benchmark_id)
-        elif definition and definition.stig_id:
-            # Try to use the definition's STIG ID as benchmark_id
-            xccdf_rules = self._get_xccdf_rules(definition.stig_id)
+        # If database rules provided, evaluate them
+        if db_rules:
+            db_results = self._evaluate_db_rules(db_rules, config, job_id)
+            results.extend(db_results)
+        else:
+            # Fallback: Try XCCDF rules from Library
+            xccdf_rules: list[XCCDFRule] = []
+            if benchmark_id:
+                xccdf_rules = self._get_xccdf_rules(benchmark_id)
+            elif definition and definition.stig_id:
+                # Try to use the definition's STIG ID as benchmark_id
+                xccdf_rules = self._get_xccdf_rules(definition.stig_id)
 
-        # Process XCCDF rules if available
-        if xccdf_rules:
-            xccdf_results = self._evaluate_xccdf_rules(xccdf_rules, config, job_id)
-            results.extend(xccdf_results)
+            # Process XCCDF rules if available
+            if xccdf_rules:
+                xccdf_results = self._evaluate_xccdf_rules(xccdf_rules, config, job_id)
+                results.extend(xccdf_results)
 
         logger.info(
             "config_analysis_complete",
@@ -523,10 +540,228 @@ class ConfigComplianceChecker:
             total_checks=len(results),
             passed=sum(1 for r in results if r.status == CheckStatus.PASS),
             failed=sum(1 for r in results if r.status == CheckStatus.FAIL),
-            xccdf_rules_used=len(xccdf_rules),
         )
 
         return results
+
+    async def _analyze_juniper_config(
+        self,
+        content: str,
+        platform: Platform,
+        definition: STIGDefinition | None,
+        job_id: str,
+        benchmark_id: str | None,
+        db_rules: list[dict] | None,
+    ) -> list[AuditResultCreate]:
+        """Analyze Juniper configuration using enhanced checker.
+
+        Args:
+            content: Raw configuration content
+            platform: Juniper platform
+            definition: STIG definition
+            job_id: Audit job ID
+            benchmark_id: Optional benchmark ID
+            db_rules: Optional database rules
+
+        Returns:
+            List of audit results
+        """
+        # Collect rules from all available sources
+        rules_to_check: list[dict] = []
+
+        # Priority 1: Database rules (from stig.definition_rules)
+        if db_rules:
+            logger.info(
+                "using_database_rules",
+                rule_count=len(db_rules),
+                definition_id=definition.id if definition else None,
+            )
+            rules_to_check.extend(db_rules)
+
+        # Priority 2: XCCDF rules from library
+        if not rules_to_check:
+            xccdf_rules: list[XCCDFRule] = []
+            if benchmark_id:
+                xccdf_rules = self._get_xccdf_rules(benchmark_id)
+            elif definition and definition.stig_id:
+                xccdf_rules = self._get_xccdf_rules(definition.stig_id)
+
+            if xccdf_rules:
+                logger.info(
+                    "using_xccdf_rules",
+                    rule_count=len(xccdf_rules),
+                    benchmark_id=benchmark_id or (definition.stig_id if definition else None),
+                )
+                # Convert XCCDF rules to dict format
+                for rule in xccdf_rules:
+                    rules_to_check.append({
+                        "vuln_id": rule.vuln_id,
+                        "rule_id": rule.rule_id,
+                        "title": rule.title,
+                        "severity": rule.severity,
+                        "check_text": rule.check_content,
+                        "fix_text": rule.fix_content,
+                    })
+
+        # Priority 3: Built-in Juniper checks
+        if not rules_to_check:
+            logger.info("using_builtin_juniper_checks")
+            builtin_checks = PLATFORM_CHECKS.get(platform, JUNIPER_CHECKS)
+            for check in builtin_checks:
+                rules_to_check.append({
+                    "vuln_id": check.vuln_id,
+                    "rule_id": check.rule_id,
+                    "title": check.title,
+                    "severity": check.severity.value,
+                    "check_text": check.description or "",
+                    "fix_text": "",
+                })
+
+        # Run the Juniper STIG analyzer
+        try:
+            results = analyze_juniper_config(content, rules_to_check, job_id)
+            logger.info(
+                "juniper_analysis_complete",
+                total_checks=len(results),
+                passed=sum(1 for r in results if r.status == CheckStatus.PASS),
+                failed=sum(1 for r in results if r.status == CheckStatus.FAIL),
+            )
+            return results
+        except Exception as e:
+            logger.error("juniper_analysis_failed", error=str(e))
+            return [
+                AuditResultCreate(
+                    job_id=job_id,
+                    rule_id="CONFIG-ANALYSIS-ERROR",
+                    title="Juniper configuration analysis failed",
+                    severity=STIGSeverity.HIGH,
+                    status=CheckStatus.ERROR,
+                    finding_details=f"Error during analysis: {str(e)}",
+                )
+            ]
+
+    def _evaluate_db_rules(
+        self,
+        rules: list[dict],
+        config: ParsedConfig,
+        job_id: str,
+    ) -> list[AuditResultCreate]:
+        """Evaluate database rules against parsed configuration.
+
+        Args:
+            rules: List of rule dictionaries
+            config: Parsed configuration
+            job_id: Audit job ID
+
+        Returns:
+            List of audit results
+        """
+        results: list[AuditResultCreate] = []
+
+        for rule in rules:
+            result = self._evaluate_single_db_rule(rule, config, job_id)
+            results.append(result)
+
+        return results
+
+    def _evaluate_single_db_rule(
+        self,
+        rule: dict,
+        config: ParsedConfig,
+        job_id: str,
+    ) -> AuditResultCreate:
+        """Evaluate a single database rule against configuration.
+
+        Args:
+            rule: Rule dictionary
+            config: Parsed configuration
+            job_id: Audit job ID
+
+        Returns:
+            Audit result
+        """
+        severity_map = {
+            "high": STIGSeverity.HIGH,
+            "medium": STIGSeverity.MEDIUM,
+            "low": STIGSeverity.LOW,
+        }
+        severity = severity_map.get(
+            rule.get("severity", "medium").lower(),
+            STIGSeverity.MEDIUM
+        )
+
+        check_text = rule.get("check_text", "").lower()
+        status = CheckStatus.NOT_REVIEWED
+        finding_details = ""
+
+        try:
+            # Similar logic to _evaluate_single_xccdf_rule but uses dict format
+            # SSH checks
+            if "ssh" in check_text:
+                ssh_patterns = self._extract_ssh_checks(rule.get("check_text", ""))
+                for key, expected in ssh_patterns:
+                    actual = config.ssh_config.get(key)
+                    if actual is not None:
+                        if str(actual).lower() == expected.lower():
+                            status = CheckStatus.PASS
+                            finding_details = f"SSH setting '{key}' is '{actual}' (expected: {expected})"
+                        else:
+                            status = CheckStatus.FAIL
+                            finding_details = f"SSH setting '{key}' is '{actual}' (expected: {expected})"
+                        break
+
+            # NTP checks
+            elif "ntp" in check_text:
+                if config.ntp_servers:
+                    status = CheckStatus.PASS
+                    finding_details = f"NTP configured: {', '.join(config.ntp_servers)}"
+                else:
+                    status = CheckStatus.FAIL
+                    finding_details = "NTP not configured"
+
+            # Syslog checks
+            elif "syslog" in check_text or "log" in rule.get("title", "").lower():
+                if config.syslog_servers:
+                    status = CheckStatus.PASS
+                    finding_details = f"Syslog configured: {', '.join(config.syslog_servers)}"
+                else:
+                    status = CheckStatus.FAIL
+                    finding_details = "Remote logging not configured"
+
+            # SNMP checks
+            elif "snmp" in check_text:
+                if config.snmp_config:
+                    status = CheckStatus.PASS
+                    finding_details = f"SNMP configured"
+                else:
+                    status = CheckStatus.NOT_REVIEWED
+                    finding_details = "SNMP configuration not detected"
+
+            # Banner checks
+            elif "banner" in check_text:
+                if config.banner:
+                    status = CheckStatus.PASS
+                    finding_details = f"Banner configured ({len(config.banner)} chars)"
+                else:
+                    status = CheckStatus.FAIL
+                    finding_details = "No login banner configured"
+
+            else:
+                status = CheckStatus.NOT_REVIEWED
+                finding_details = "Manual review required"
+
+        except Exception as e:
+            status = CheckStatus.ERROR
+            finding_details = f"Error evaluating rule: {str(e)}"
+
+        return AuditResultCreate(
+            job_id=job_id,
+            rule_id=rule.get("vuln_id", rule.get("rule_id", "")),
+            title=rule.get("title", ""),
+            severity=severity,
+            status=status,
+            finding_details=finding_details,
+        )
 
     def _get_xccdf_rules(self, benchmark_id: str) -> list[XCCDFRule]:
         """Get XCCDF rules from the library.

@@ -1,13 +1,13 @@
 # NetNynja Enterprise - Project Status
 
-**Version**: 0.2.9
-**Last Updated**: 2026-01-16 20:15 EST
+**Version**: 0.2.12
+**Last Updated**: 2026-01-18 10:45 EST
 **Current Phase**: Phase 9 - CI/CD & Release (Complete)
 **Overall Progress**: ▓▓▓▓▓▓▓▓▓▓ 100%
-**Issues**: 0 Open | 152 Resolved | 1 Deferred
+**Issues**: 0 Open | 161 Resolved | 1 Deferred
 **Security Posture**: Medium (Docker Scout: 1 Critical, 3 High | npm audit: 0 vulnerabilities ✅)
 **Container Security**: All 14 images cryptographically signed with Cosign ✅
-**Release Status**: v0.2.9 Ready (CI: PENDING)
+**Release Status**: v0.2.12 Ready (CI: PENDING)
 
 ---
 
@@ -272,7 +272,59 @@ Library Stats (October 2025):
 - 14,361 total STIG rules
 - 14 platforms covered with mapped STIGs
 
-### [Unreleased]
+### [0.2.12] - 2026-01-18 (Multi-STIG Config Analysis & Combined Reports)
+
+**Multi-STIG Config Analysis with Combined PDF/CKL Reports**
+
+CI/CD Status: PENDING
+
+New Features:
+
+- Config analysis now runs against ALL assigned/enabled STIGs (not just first)
+- Combined PDF report with executive summary and per-STIG sections
+- Combined CKL export as ZIP file with separate CKL per STIG
+- Executive summary shows overall compliance across all analyzed STIGs
+- Per-STIG breakdown tables with check counts and compliance percentages
+
+API Endpoints Added:
+
+- GET /api/v1/stig/reports/combined-pdf?job_ids=id1,id2,... - Combined PDF for multiple jobs
+- GET /api/v1/stig/reports/combined-ckl?job_ids=id1,id2,... - Combined CKL ZIP for multiple jobs
+
+Files Modified:
+
+- apps/stig/src/stig/api/routes.py - Added combined report endpoints
+- apps/stig/src/stig/reports/generator.py - Added generate_combined_pdf_from_jobs(), generate_combined_ckl_from_jobs()
+- apps/gateway/src/routes/stig/index.ts - Added gateway proxy routes for combined reports
+- apps/web-ui/src/modules/stig/pages/AssetsPage.tsx - Multi-STIG analysis loop, job ID tracking
+
+Issues Resolved:
+
+- STIG-18: Config analysis only analyzed first STIG
+- STIG-19: Combined PDF report for multi-STIG analysis
+
+### [0.2.11] - 2026-01-18 (STIG Report Enhancements)
+
+**PDF/CKL Report Full Finding Details**
+
+CI/CD Status: PENDING
+
+Fixes:
+
+- PDF reports now include ALL findings (not just failed) with full details
+- Added vulnerability discussion and fix text to PDF findings
+- CKL exports include complete rule details from database
+- Extracted VulnDiscussion content from raw XML descriptions
+- Added clean_text_for_pdf() helper for safe PDF rendering
+
+Issues Resolved:
+
+- STIG-14: Config analysis uses assigned STIGs
+- STIG-15: PDF report full V-ID details
+- STIG-16: CKL report full V-ID details
+- STIG-17: PDF description contains raw XML tags
+
+### [0.2.10] - 2026-01-17 (Multi-STIG Assignment)
 
 **Gateway-to-STIG Service Proxy Routes**
 

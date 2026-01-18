@@ -1,8 +1,10 @@
 """PDF report generation for STIG audit results."""
 
+import re
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -15,6 +17,7 @@ from reportlab.platypus import (
     Table,
     TableStyle,
     PageBreak,
+    KeepTogether,
 )
 
 from ..core.config import settings
@@ -29,6 +32,54 @@ from ..models import (
 )
 
 logger = get_logger(__name__)
+
+
+def extract_vuln_discussion(description: str) -> str:
+    """Extract the VulnDiscussion content from STIG description XML.
+
+    The description field often contains XML-like content with tags such as:
+    <VulnDiscussion>...</VulnDiscussion><FalsePositives>...</FalsePositives>...
+
+    This function extracts just the VulnDiscussion content.
+
+    Args:
+        description: Raw description that may contain XML tags
+
+    Returns:
+        Clean description text
+    """
+    if not description:
+        return ""
+
+    # Try to extract content from <VulnDiscussion> tags
+    match = re.search(r'<VulnDiscussion>(.*?)</VulnDiscussion>', description, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+
+    # If no VulnDiscussion tag, strip any XML-like tags
+    # This handles cases where the description might have other XML tags
+    cleaned = re.sub(r'<[^>]+>', '', description)
+    return cleaned.strip()
+
+
+def clean_text_for_pdf(text: str) -> str:
+    """Clean text for safe PDF rendering.
+
+    Args:
+        text: Raw text that may contain special characters
+
+    Returns:
+        Text safe for ReportLab PDF rendering
+    """
+    if not text:
+        return ""
+
+    # Escape XML/HTML special characters for ReportLab
+    text = text.replace("&", "&amp;")
+    text = text.replace("<", "&lt;")
+    text = text.replace(">", "&gt;")
+
+    return text
 
 
 # Color scheme
@@ -97,6 +148,38 @@ class PDFExporter:
                 fontName="Helvetica-Bold",
             )
         )
+        self.styles.add(
+            ParagraphStyle(
+                "Description",
+                parent=self.styles["Normal"],
+                fontSize=9,
+                leftIndent=20,
+                spaceBefore=4,
+                spaceAfter=4,
+                textColor=colors.HexColor("#374151"),
+            )
+        )
+        self.styles.add(
+            ParagraphStyle(
+                "FixText",
+                parent=self.styles["Normal"],
+                fontSize=9,
+                leftIndent=20,
+                spaceBefore=4,
+                spaceAfter=8,
+                textColor=colors.HexColor("#1d4ed8"),
+                fontName="Helvetica-Oblique",
+            )
+        )
+        self.styles.add(
+            ParagraphStyle(
+                "FieldLabel",
+                parent=self.styles["Normal"],
+                fontSize=9,
+                fontName="Helvetica-Bold",
+                textColor=colors.HexColor("#4b5563"),
+            )
+        )
 
     def export(
         self,
@@ -108,6 +191,7 @@ class PDFExporter:
         output_path: Path,
         include_details: bool = True,
         include_remediation: bool = True,
+        rule_details: dict[str, dict[str, Any]] | None = None,
     ) -> Path:
         """Export audit results to PDF format.
 
@@ -120,6 +204,7 @@ class PDFExporter:
             output_path: Path to write PDF file
             include_details: Include finding details
             include_remediation: Include remediation guidance
+            rule_details: Optional dict mapping rule_id to rule info (description, fix_text)
 
         Returns:
             Path to the generated PDF file
@@ -150,7 +235,9 @@ class PDFExporter:
         story.append(PageBreak())
 
         # Findings by severity
-        story.extend(self._build_findings_section(results, include_details, include_remediation))
+        story.extend(self._build_findings_section(
+            results, include_details, include_remediation, rule_details
+        ))
 
         # Build PDF
         doc.build(story)
@@ -251,22 +338,34 @@ class PDFExporter:
         # Severity breakdown
         elements.append(Paragraph("Findings by Severity", self.styles["Section"]))
 
+        # Helper to safely get severity breakdown values
+        def get_sev(severity: str, field: str) -> int:
+            breakdown = summary.severity_breakdown.get(severity)
+            if breakdown is None:
+                return 0
+            # Handle both dict and Pydantic model
+            if hasattr(breakdown, field):
+                return getattr(breakdown, field, 0)
+            elif isinstance(breakdown, dict):
+                return breakdown.get(field, 0)
+            return 0
+
         sev_data = [
             ["Severity", "Passed", "Failed"],
             [
                 "High",
-                str(summary.severity_breakdown.get("high", {}).get("passed", 0)),
-                str(summary.severity_breakdown.get("high", {}).get("failed", 0)),
+                str(get_sev("high", "passed")),
+                str(get_sev("high", "failed")),
             ],
             [
                 "Medium",
-                str(summary.severity_breakdown.get("medium", {}).get("passed", 0)),
-                str(summary.severity_breakdown.get("medium", {}).get("failed", 0)),
+                str(get_sev("medium", "passed")),
+                str(get_sev("medium", "failed")),
             ],
             [
                 "Low",
-                str(summary.severity_breakdown.get("low", {}).get("passed", 0)),
-                str(summary.severity_breakdown.get("low", {}).get("failed", 0)),
+                str(get_sev("low", "passed")),
+                str(get_sev("low", "failed")),
             ],
         ]
 
@@ -298,53 +397,220 @@ class PDFExporter:
         results: list[AuditResult],
         include_details: bool,
         include_remediation: bool,
+        rule_details: dict[str, dict[str, Any]] | None = None,
     ) -> list:
-        """Build detailed findings section."""
+        """Build detailed findings section.
+
+        Args:
+            results: Audit results
+            include_details: Include finding details
+            include_remediation: Include fix guidance
+            rule_details: Optional dict mapping rule_id to rule info
+        """
         elements = []
+        rule_details = rule_details or {}
 
-        # Group results by severity and status
-        failed_results = [r for r in results if r.status == CheckStatus.FAIL]
-
-        # Sort by severity
+        # Sort all results by severity, then by rule_id
         severity_order = {"high": 0, "medium": 1, "low": 2}
-        failed_results.sort(
-            key=lambda r: severity_order.get(r.severity.value if r.severity else "medium", 3)
+        sorted_results = sorted(
+            results,
+            key=lambda r: (
+                severity_order.get(r.severity.value if r.severity else "medium", 3),
+                r.rule_id or "",
+            ),
         )
 
-        if not failed_results:
-            elements.append(Paragraph("Detailed Findings", self.styles["Section"]))
-            elements.append(Paragraph("No failed checks found.", self.styles["Normal"]))
-            return elements
-
-        elements.append(Paragraph("Failed Findings", self.styles["Section"]))
+        # Build complete findings table (all V-IDs with status)
+        elements.append(Paragraph("Complete Findings List", self.styles["Section"]))
         elements.append(
             Paragraph(
-                f"The following {len(failed_results)} checks failed and require attention:",
+                f"All {len(sorted_results)} STIG checks with their compliance status:",
                 self.styles["Normal"],
             )
         )
         elements.append(Spacer(1, 12))
 
-        for result in failed_results:
+        # Status color mapping
+        status_colors = {
+            CheckStatus.PASS: COLORS["pass"],
+            CheckStatus.FAIL: COLORS["fail"],
+            CheckStatus.NOT_APPLICABLE: COLORS["na"],
+            CheckStatus.NOT_REVIEWED: COLORS["na"],
+            CheckStatus.ERROR: COLORS["fail"],
+        }
+
+        # Build table data
+        table_data = [["V-ID", "Severity", "Status", "Title"]]
+        row_styles = []
+
+        for idx, result in enumerate(sorted_results):
+            severity = result.severity.value.upper() if result.severity else "MEDIUM"
+            status = result.status.value.upper() if result.status else "NOT_REVIEWED"
+            # Truncate title for table display
+            title = result.title or "No title"
+            if len(title) > 60:
+                title = title[:57] + "..."
+
+            table_data.append([result.rule_id or "N/A", severity, status, title])
+
+            # Add row-specific styling based on status
+            row_num = idx + 1  # +1 for header row
+            status_color = status_colors.get(result.status, COLORS["na"])
+            row_styles.append(("TEXTCOLOR", (2, row_num), (2, row_num), status_color))
+
+            # Color severity column
+            sev_color = COLORS.get(severity.lower(), COLORS["medium"])
+            row_styles.append(("TEXTCOLOR", (1, row_num), (1, row_num), sev_color))
+
+        findings_table = Table(
+            table_data,
+            colWidths=[1.5 * inch, 0.75 * inch, 1 * inch, 3.75 * inch],
+        )
+
+        base_styles = [
+            ("BACKGROUND", (0, 0), (-1, 0), COLORS["header"]),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ALIGN", (1, 0), (2, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ]
+        findings_table.setStyle(TableStyle(base_styles + row_styles))
+
+        elements.append(findings_table)
+        elements.append(PageBreak())
+
+        # All findings details section with full descriptions
+        # Use already sorted results (by severity, then rule_id)
+        if not sorted_results:
+            elements.append(Paragraph("All Findings Details", self.styles["Section"]))
+            elements.append(
+                Paragraph(
+                    "No checks found.",
+                    self.styles["Normal"],
+                )
+            )
+            return elements
+
+        elements.append(Paragraph("All Findings Details", self.styles["Section"]))
+        failed_count = sum(1 for r in sorted_results if r.status == CheckStatus.FAIL)
+        passed_count = sum(1 for r in sorted_results if r.status == CheckStatus.PASS)
+        elements.append(
+            Paragraph(
+                f"Complete details for all {len(sorted_results)} checks "
+                f"({passed_count} passed, {failed_count} failed). "
+                "Each finding includes the full description and recommended fix where applicable.",
+                self.styles["Normal"],
+            )
+        )
+        elements.append(Spacer(1, 12))
+
+        for result in sorted_results:
             severity = result.severity.value if result.severity else "medium"
             style_name = f"Finding{severity.capitalize()}"
 
-            elements.append(
+            # Get rule details from the dictionary
+            rule_info = rule_details.get(result.rule_id, {})
+            raw_description = rule_info.get("description", "")
+            fix_text = rule_info.get("fix_text", "")
+
+            # Extract just the VulnDiscussion content from the description
+            description = extract_vuln_discussion(raw_description)
+
+            # Build finding block (kept together)
+            # Format: V-ID, Severity, Status, Description, Fix Text
+            finding_block = []
+
+            # V-ID (Rule ID)
+            finding_block.append(
                 Paragraph(
-                    f"[{severity.upper()}] {result.rule_id}: {result.title or 'No title'}",
+                    f"<b>V-ID:</b> {result.rule_id or 'N/A'}",
                     self.styles.get(style_name, self.styles["Normal"]),
                 )
             )
 
-            if include_details and result.finding_details:
-                elements.append(Spacer(1, 4))
-                elements.append(
-                    Paragraph(
-                        f"<b>Finding:</b> {result.finding_details}",
-                        self.styles["Normal"],
-                    )
+            # Severity
+            finding_block.append(
+                Paragraph(
+                    f"<b>Severity:</b> {severity.upper()}",
+                    self.styles["Normal"],
+                )
+            )
+
+            # Status with color coding
+            status_text = result.status.value.upper() if result.status else "NOT_REVIEWED"
+            status_display = {
+                "PASS": "Closed",
+                "FAIL": "Open",
+                "NOT_APPLICABLE": "N/A",
+                "NOT_REVIEWED": "Not Reviewed",
+                "ERROR": "Error",
+            }.get(status_text, status_text)
+            status_color = {
+                "PASS": "#059669",  # green
+                "FAIL": "#dc2626",  # red
+                "NOT_APPLICABLE": "#6b7280",  # gray
+                "NOT_REVIEWED": "#d97706",  # amber
+                "ERROR": "#dc2626",  # red
+            }.get(status_text, "#6b7280")
+            finding_block.append(
+                Paragraph(
+                    f"<b>Status:</b> <font color='{status_color}'>{status_display}</font>",
+                    self.styles["Normal"],
+                )
+            )
+
+            # Title
+            finding_block.append(
+                Paragraph(
+                    f"<b>Title:</b> {clean_text_for_pdf(result.title or 'No title')}",
+                    self.styles["Normal"],
+                )
+            )
+            finding_block.append(Spacer(1, 6))
+
+            # Description (Vulnerability Discussion - cleaned)
+            if description:
+                finding_block.append(
+                    Paragraph("<b>Description:</b>", self.styles["FieldLabel"])
+                )
+                finding_block.append(
+                    Paragraph(clean_text_for_pdf(description), self.styles["Description"])
                 )
 
-            elements.append(Spacer(1, 12))
+            # Finding details (what was found during the audit)
+            if include_details and result.finding_details:
+                finding_block.append(
+                    Paragraph("<b>Finding Details:</b>", self.styles["FieldLabel"])
+                )
+                finding_block.append(
+                    Paragraph(clean_text_for_pdf(result.finding_details), self.styles["Description"])
+                )
+
+            # Fix text (remediation guidance)
+            if include_remediation and fix_text:
+                finding_block.append(
+                    Paragraph("<b>Fix Text (Remediation):</b>", self.styles["FieldLabel"])
+                )
+                finding_block.append(
+                    Paragraph(clean_text_for_pdf(fix_text), self.styles["FixText"])
+                )
+
+            # Add separator line
+            finding_block.append(Spacer(1, 8))
+            finding_block.append(
+                Paragraph(
+                    "_" * 80,
+                    self.styles["Normal"],
+                )
+            )
+            finding_block.append(Spacer(1, 12))
+
+            # Keep the entire finding together on one page if possible
+            elements.append(KeepTogether(finding_block))
 
         return elements

@@ -259,6 +259,249 @@ const stigRoutes: FastifyPluginAsync = async (fastify) => {
   // Register target routes (config analysis proxied to STIG service)
   fastify.register(targetRoutes, { prefix: "/targets" });
 
+  // Register target-STIG assignment routes (STIG-13: Multi-STIG Support)
+  fastify.register(targetDefinitionRoutes, { prefix: "/targets" });
+
+  // Register audit group routes (STIG-13: Multi-STIG Support)
+  fastify.register(auditGroupRoutes, { prefix: "/audit-groups" });
+
+  // =============================================================================
+  // Report Routes
+  // =============================================================================
+
+  // POST /reports/generate - Generate a report
+  fastify.post(
+    "/reports/generate",
+    async (request, reply) => {
+      try {
+        const result = await proxyToSTIGService(
+          "/api/v1/stig/reports/generate",
+          "POST",
+          request.body,
+          request.headers.authorization,
+        );
+        reply.status(result.status);
+        return result.data;
+      } catch (err) {
+        logger.error({ err }, "Failed to proxy report generation to STIG service");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
+  // GET /reports/download/:jobId - Download a report
+  fastify.get<{
+    Params: { jobId: string };
+    Querystring: { format?: string };
+  }>(
+    "/reports/download/:jobId",
+    async (request, reply) => {
+      const { jobId } = request.params;
+      const format = request.query.format || "pdf";
+
+      try {
+        const { config } = await import("../../config");
+        const url = `${config.STIG_SERVICE_URL}/api/v1/stig/reports/download/${jobId}?format=${format}`;
+        logger.info({ url, jobId, format }, "Proxying report download request");
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            Authorization: request.headers.authorization || "",
+          },
+        });
+
+        logger.info({ status: response.status, ok: response.ok }, "STIG service response received");
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          logger.warn({ status: response.status, errorText }, "STIG service returned error");
+          let errorMessage = "Failed to download report";
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.detail || errorData.message || errorMessage;
+          } catch {
+            // Not JSON, use raw text
+            if (errorText) errorMessage = errorText;
+          }
+          reply.status(response.status);
+          return {
+            success: false,
+            error: {
+              code: "REPORT_DOWNLOAD_FAILED",
+              message: errorMessage,
+            },
+          };
+        }
+
+        // Get content type and filename from response headers
+        const contentType = response.headers.get("content-type") || "application/octet-stream";
+        const contentDisposition = response.headers.get("content-disposition") || "";
+        logger.info({ contentType, contentDisposition }, "Report response headers");
+
+        // Extract filename from content-disposition header
+        const filenameMatch = contentDisposition.match(/filename="?([^";\n]+)"?/);
+        const filename = filenameMatch ? filenameMatch[1] : `report_${jobId}.${format}`;
+
+        // Stream the file response
+        const buffer = await response.arrayBuffer();
+        logger.info({ bufferSize: buffer.byteLength, filename }, "Sending report file");
+
+        reply
+          .header("Content-Type", contentType)
+          .header("Content-Disposition", `attachment; filename="${filename}"`)
+          .send(Buffer.from(buffer));
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        const errorStack = err instanceof Error ? err.stack : undefined;
+        logger.error({ err, errorMessage, errorStack }, "Failed to proxy report download to STIG service");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
+  // GET /reports/combined-pdf - Download combined PDF from multiple jobs
+  fastify.get<{
+    Querystring: { job_ids: string };
+  }>(
+    "/reports/combined-pdf",
+    async (request, reply) => {
+      const jobIds = request.query.job_ids;
+
+      if (!jobIds) {
+        reply.status(400);
+        return {
+          success: false,
+          error: { code: "INVALID_REQUEST", message: "job_ids parameter is required" },
+        };
+      }
+
+      try {
+        const { config } = await import("../../config");
+        const url = `${config.STIG_SERVICE_URL}/api/v1/stig/reports/combined-pdf?job_ids=${encodeURIComponent(jobIds)}`;
+        logger.info({ url, jobIds }, "Proxying combined PDF download request");
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            Authorization: request.headers.authorization || "",
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          logger.warn({ status: response.status, errorText }, "STIG service returned error");
+          let errorMessage = "Failed to download combined PDF";
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.detail || errorData.message || errorMessage;
+          } catch {
+            if (errorText) errorMessage = errorText;
+          }
+          reply.status(response.status);
+          return {
+            success: false,
+            error: { code: "REPORT_DOWNLOAD_FAILED", message: errorMessage },
+          };
+        }
+
+        const contentType = response.headers.get("content-type") || "application/pdf";
+        const contentDisposition = response.headers.get("content-disposition") || "";
+        const filenameMatch = contentDisposition.match(/filename="?([^";\n]+)"?/);
+        const filename = filenameMatch ? filenameMatch[1] : "Combined_STIG_Report.pdf";
+
+        const buffer = await response.arrayBuffer();
+        reply
+          .header("Content-Type", contentType)
+          .header("Content-Disposition", `attachment; filename="${filename}"`)
+          .send(Buffer.from(buffer));
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        logger.error({ err, errorMessage }, "Failed to proxy combined PDF download");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
+  // GET /reports/combined-ckl - Download combined CKL ZIP from multiple jobs
+  fastify.get<{
+    Querystring: { job_ids: string };
+  }>(
+    "/reports/combined-ckl",
+    async (request, reply) => {
+      const jobIds = request.query.job_ids;
+
+      if (!jobIds) {
+        reply.status(400);
+        return {
+          success: false,
+          error: { code: "INVALID_REQUEST", message: "job_ids parameter is required" },
+        };
+      }
+
+      try {
+        const { config } = await import("../../config");
+        const url = `${config.STIG_SERVICE_URL}/api/v1/stig/reports/combined-ckl?job_ids=${encodeURIComponent(jobIds)}`;
+        logger.info({ url, jobIds }, "Proxying combined CKL download request");
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            Authorization: request.headers.authorization || "",
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          logger.warn({ status: response.status, errorText }, "STIG service returned error");
+          let errorMessage = "Failed to download combined CKL";
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.detail || errorData.message || errorMessage;
+          } catch {
+            if (errorText) errorMessage = errorText;
+          }
+          reply.status(response.status);
+          return {
+            success: false,
+            error: { code: "REPORT_DOWNLOAD_FAILED", message: errorMessage },
+          };
+        }
+
+        const contentType = response.headers.get("content-type") || "application/zip";
+        const contentDisposition = response.headers.get("content-disposition") || "";
+        const filenameMatch = contentDisposition.match(/filename="?([^";\n]+)"?/);
+        const filename = filenameMatch ? filenameMatch[1] : "STIG_Checklists.zip";
+
+        const buffer = await response.arrayBuffer();
+        reply
+          .header("Content-Type", contentType)
+          .header("Content-Disposition", `attachment; filename="${filename}"`)
+          .send(Buffer.from(buffer));
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        logger.error({ err, errorMessage }, "Failed to proxy combined CKL download");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
   // List STIG definitions (benchmarks)
   fastify.get(
     "/benchmarks",
@@ -1703,6 +1946,1100 @@ const stigRoutes: FastifyPluginAsync = async (fastify) => {
 };
 
 // =============================================================================
+// Target-STIG Assignment Routes (STIG-13: Multi-STIG Support)
+// =============================================================================
+
+// Zod schemas for target-STIG assignments
+const targetDefinitionCreateSchema = z.object({
+  definitionId: z.string().uuid(),
+  isPrimary: z.boolean().default(false),
+  enabled: z.boolean().default(true),
+  notes: z.string().optional(),
+});
+
+const targetDefinitionUpdateSchema = z.object({
+  isPrimary: z.boolean().optional(),
+  enabled: z.boolean().optional(),
+  notes: z.string().optional(),
+});
+
+const bulkAssignmentSchema = z.object({
+  definitionIds: z.array(z.string().uuid()).min(1),
+  primaryId: z.string().uuid().optional(),
+});
+
+const auditAllSchema = z.object({
+  definitionIds: z.array(z.string().uuid()).optional(),
+  name: z.string().optional(),
+});
+
+const targetDefinitionRoutes: FastifyPluginAsync = async (fastify) => {
+  // List STIGs assigned to a target
+  fastify.get<{
+    Params: { targetId: string };
+    Querystring: { includeCompliance?: boolean };
+  }>(
+    "/:targetId/definitions",
+    {
+      schema: {
+        tags: ["STIG - Target Assignments"],
+        summary: "List STIG definitions assigned to a target",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            targetId: { type: "string", format: "uuid" },
+          },
+          required: ["targetId"],
+        },
+        querystring: {
+          type: "object",
+          properties: {
+            includeCompliance: { type: "boolean", default: false },
+          },
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const { targetId } = request.params;
+      const includeCompliance = request.query.includeCompliance ?? false;
+
+      // Verify target exists
+      const targetResult = await pool.query(
+        "SELECT id FROM stig.targets WHERE id = $1",
+        [targetId],
+      );
+      if (targetResult.rows.length === 0) {
+        reply.status(404);
+        return {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Target not found" },
+        };
+      }
+
+      // Base query for assigned definitions
+      let dataQuery: string;
+      if (includeCompliance) {
+        // Include compliance info from latest audit for each STIG
+        dataQuery = `
+          SELECT td.id, td.target_id, td.definition_id, td.is_primary, td.enabled, td.notes,
+                 td.created_at, td.updated_at,
+                 d.stig_id, d.title as stig_title, d.version as stig_version,
+                 (SELECT COUNT(*) FROM stig.definition_rules dr WHERE dr.definition_id = d.id) as rules_count,
+                 j.completed_at as last_audit_date,
+                 j.status as last_audit_status,
+                 CASE WHEN ar_summary.total > 0
+                      THEN ROUND((ar_summary.passed::numeric / ar_summary.total) * 100, 1)
+                      ELSE NULL END as compliance_score,
+                 ar_summary.passed, ar_summary.failed, ar_summary.not_reviewed
+          FROM stig.target_definitions td
+          JOIN stig.definitions d ON td.definition_id = d.id
+          LEFT JOIN LATERAL (
+            SELECT id, completed_at, status
+            FROM stig.audit_jobs
+            WHERE target_id = td.target_id AND definition_id = td.definition_id
+            ORDER BY completed_at DESC NULLS LAST
+            LIMIT 1
+          ) j ON true
+          LEFT JOIN LATERAL (
+            SELECT
+              COUNT(*) as total,
+              COUNT(*) FILTER (WHERE status = 'pass') as passed,
+              COUNT(*) FILTER (WHERE status = 'fail') as failed,
+              COUNT(*) FILTER (WHERE status = 'not_reviewed') as not_reviewed
+            FROM stig.audit_results
+            WHERE job_id = j.id
+          ) ar_summary ON j.id IS NOT NULL
+          WHERE td.target_id = $1
+          ORDER BY td.is_primary DESC, d.title
+        `;
+      } else {
+        dataQuery = `
+          SELECT td.id, td.target_id, td.definition_id, td.is_primary, td.enabled, td.notes,
+                 td.created_at, td.updated_at,
+                 d.stig_id, d.title as stig_title, d.version as stig_version,
+                 (SELECT COUNT(*) FROM stig.definition_rules dr WHERE dr.definition_id = d.id) as rules_count
+          FROM stig.target_definitions td
+          JOIN stig.definitions d ON td.definition_id = d.id
+          WHERE td.target_id = $1
+          ORDER BY td.is_primary DESC, d.title
+        `;
+      }
+
+      const dataResult = await pool.query(dataQuery, [targetId]);
+
+      const assignments = dataResult.rows.map((row) => {
+        const base = {
+          id: row.id,
+          targetId: row.target_id,
+          definitionId: row.definition_id,
+          isPrimary: row.is_primary,
+          enabled: row.enabled,
+          notes: row.notes,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          stigId: row.stig_id,
+          stigTitle: row.stig_title,
+          stigVersion: row.stig_version,
+          rulesCount: parseInt(row.rules_count, 10),
+        };
+
+        if (includeCompliance) {
+          return {
+            ...base,
+            lastAuditDate: row.last_audit_date,
+            lastAuditStatus: row.last_audit_status,
+            complianceScore: row.compliance_score ? parseFloat(row.compliance_score) : null,
+            passed: row.passed ? parseInt(row.passed, 10) : null,
+            failed: row.failed ? parseInt(row.failed, 10) : null,
+            notReviewed: row.not_reviewed ? parseInt(row.not_reviewed, 10) : null,
+          };
+        }
+        return base;
+      });
+
+      return {
+        success: true,
+        data: assignments,
+      };
+    },
+  );
+
+  // Assign a single STIG to a target
+  fastify.post<{
+    Params: { targetId: string };
+    Body: z.infer<typeof targetDefinitionCreateSchema>;
+  }>(
+    "/:targetId/definitions",
+    {
+      schema: {
+        tags: ["STIG - Target Assignments"],
+        summary: "Assign a STIG to a target",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            targetId: { type: "string", format: "uuid" },
+          },
+          required: ["targetId"],
+        },
+        body: {
+          type: "object",
+          required: ["definitionId"],
+          properties: {
+            definitionId: { type: "string", format: "uuid" },
+            isPrimary: { type: "boolean" },
+            enabled: { type: "boolean" },
+            notes: { type: "string" },
+          },
+        },
+      },
+      preHandler: [fastify.requireAuth, fastify.requireRole("admin", "operator")],
+    },
+    async (request, reply) => {
+      const { targetId } = request.params;
+      const body = targetDefinitionCreateSchema.parse(request.body);
+
+      // Verify target exists
+      const targetResult = await pool.query(
+        "SELECT id FROM stig.targets WHERE id = $1",
+        [targetId],
+      );
+      if (targetResult.rows.length === 0) {
+        reply.status(404);
+        return {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Target not found" },
+        };
+      }
+
+      // Verify definition exists
+      const defResult = await pool.query(
+        "SELECT id FROM stig.definitions WHERE id = $1",
+        [body.definitionId],
+      );
+      if (defResult.rows.length === 0) {
+        reply.status(404);
+        return {
+          success: false,
+          error: { code: "NOT_FOUND", message: "STIG definition not found" },
+        };
+      }
+
+      // Check if already assigned
+      const existingResult = await pool.query(
+        "SELECT id FROM stig.target_definitions WHERE target_id = $1 AND definition_id = $2",
+        [targetId, body.definitionId],
+      );
+      if (existingResult.rows.length > 0) {
+        reply.status(409);
+        return {
+          success: false,
+          error: { code: "CONFLICT", message: "STIG already assigned to target" },
+        };
+      }
+
+      // Insert assignment
+      const result = await pool.query(
+        `INSERT INTO stig.target_definitions (target_id, definition_id, is_primary, enabled, notes)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, target_id, definition_id, is_primary, enabled, notes, created_at, updated_at`,
+        [targetId, body.definitionId, body.isPrimary, body.enabled, body.notes],
+      );
+
+      const row = result.rows[0];
+      logger.info({ targetId, definitionId: body.definitionId }, "STIG assigned to target");
+
+      reply.status(201);
+      return {
+        success: true,
+        data: {
+          id: row.id,
+          targetId: row.target_id,
+          definitionId: row.definition_id,
+          isPrimary: row.is_primary,
+          enabled: row.enabled,
+          notes: row.notes,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        },
+      };
+    },
+  );
+
+  // Bulk assign STIGs to a target
+  fastify.post<{
+    Params: { targetId: string };
+    Body: z.infer<typeof bulkAssignmentSchema>;
+  }>(
+    "/:targetId/definitions/bulk",
+    {
+      schema: {
+        tags: ["STIG - Target Assignments"],
+        summary: "Bulk assign multiple STIGs to a target",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            targetId: { type: "string", format: "uuid" },
+          },
+          required: ["targetId"],
+        },
+        body: {
+          type: "object",
+          required: ["definitionIds"],
+          properties: {
+            definitionIds: {
+              type: "array",
+              items: { type: "string", format: "uuid" },
+              minItems: 1,
+            },
+            primaryId: { type: "string", format: "uuid" },
+          },
+        },
+      },
+      preHandler: [fastify.requireAuth, fastify.requireRole("admin", "operator")],
+    },
+    async (request, reply) => {
+      const { targetId } = request.params;
+      const body = bulkAssignmentSchema.parse(request.body);
+
+      // Verify target exists
+      const targetResult = await pool.query(
+        "SELECT id FROM stig.targets WHERE id = $1",
+        [targetId],
+      );
+      if (targetResult.rows.length === 0) {
+        reply.status(404);
+        return {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Target not found" },
+        };
+      }
+
+      let assigned = 0;
+      let skipped = 0;
+      const errors: string[] = [];
+
+      for (const definitionId of body.definitionIds) {
+        try {
+          // Check if definition exists
+          const defResult = await pool.query(
+            "SELECT id FROM stig.definitions WHERE id = $1",
+            [definitionId],
+          );
+          if (defResult.rows.length === 0) {
+            errors.push(`Definition ${definitionId} not found`);
+            continue;
+          }
+
+          // Try to insert (ON CONFLICT DO NOTHING)
+          const isPrimary = body.primaryId === definitionId;
+          const insertResult = await pool.query(
+            `INSERT INTO stig.target_definitions (target_id, definition_id, is_primary, enabled)
+             VALUES ($1, $2, $3, true)
+             ON CONFLICT (target_id, definition_id) DO NOTHING
+             RETURNING id`,
+            [targetId, definitionId, isPrimary],
+          );
+
+          if (insertResult.rows.length > 0) {
+            assigned++;
+          } else {
+            skipped++;
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          errors.push(`Failed to assign ${definitionId}: ${msg}`);
+        }
+      }
+
+      logger.info({ targetId, assigned, skipped, errorCount: errors.length }, "Bulk STIG assignment completed");
+
+      return {
+        success: true,
+        data: {
+          targetId,
+          assigned,
+          skipped,
+          errors,
+        },
+      };
+    },
+  );
+
+  // Update a STIG assignment
+  fastify.patch<{
+    Params: { targetId: string; assignmentId: string };
+    Body: z.infer<typeof targetDefinitionUpdateSchema>;
+  }>(
+    "/:targetId/definitions/:assignmentId",
+    {
+      schema: {
+        tags: ["STIG - Target Assignments"],
+        summary: "Update a STIG assignment",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            targetId: { type: "string", format: "uuid" },
+            assignmentId: { type: "string", format: "uuid" },
+          },
+          required: ["targetId", "assignmentId"],
+        },
+        body: {
+          type: "object",
+          properties: {
+            isPrimary: { type: "boolean" },
+            enabled: { type: "boolean" },
+            notes: { type: "string" },
+          },
+        },
+      },
+      preHandler: [fastify.requireAuth, fastify.requireRole("admin", "operator")],
+    },
+    async (request, reply) => {
+      const { targetId, assignmentId } = request.params;
+      const body = targetDefinitionUpdateSchema.parse(request.body);
+
+      // Verify assignment exists and belongs to this target
+      const existingResult = await pool.query(
+        "SELECT id FROM stig.target_definitions WHERE id = $1 AND target_id = $2",
+        [assignmentId, targetId],
+      );
+      if (existingResult.rows.length === 0) {
+        reply.status(404);
+        return {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Assignment not found" },
+        };
+      }
+
+      // Build update query dynamically
+      const updates: string[] = [];
+      const params: unknown[] = [];
+      let paramIndex = 1;
+
+      if (body.isPrimary !== undefined) {
+        updates.push(`is_primary = $${paramIndex++}`);
+        params.push(body.isPrimary);
+      }
+      if (body.enabled !== undefined) {
+        updates.push(`enabled = $${paramIndex++}`);
+        params.push(body.enabled);
+      }
+      if (body.notes !== undefined) {
+        updates.push(`notes = $${paramIndex++}`);
+        params.push(body.notes);
+      }
+
+      if (updates.length === 0) {
+        reply.status(400);
+        return {
+          success: false,
+          error: { code: "BAD_REQUEST", message: "No fields to update" },
+        };
+      }
+
+      updates.push(`updated_at = NOW()`);
+      params.push(assignmentId);
+
+      const result = await pool.query(
+        `UPDATE stig.target_definitions
+         SET ${updates.join(", ")}
+         WHERE id = $${paramIndex}
+         RETURNING id, target_id, definition_id, is_primary, enabled, notes, created_at, updated_at`,
+        params,
+      );
+
+      const row = result.rows[0];
+      logger.info({ targetId, assignmentId }, "STIG assignment updated");
+
+      return {
+        success: true,
+        data: {
+          id: row.id,
+          targetId: row.target_id,
+          definitionId: row.definition_id,
+          isPrimary: row.is_primary,
+          enabled: row.enabled,
+          notes: row.notes,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        },
+      };
+    },
+  );
+
+  // Remove a STIG assignment
+  fastify.delete<{
+    Params: { targetId: string; assignmentId: string };
+  }>(
+    "/:targetId/definitions/:assignmentId",
+    {
+      schema: {
+        tags: ["STIG - Target Assignments"],
+        summary: "Remove a STIG from a target",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            targetId: { type: "string", format: "uuid" },
+            assignmentId: { type: "string", format: "uuid" },
+          },
+          required: ["targetId", "assignmentId"],
+        },
+      },
+      preHandler: [fastify.requireAuth, fastify.requireRole("admin", "operator")],
+    },
+    async (request, reply) => {
+      const { targetId, assignmentId } = request.params;
+
+      const result = await pool.query(
+        "DELETE FROM stig.target_definitions WHERE id = $1 AND target_id = $2 RETURNING id",
+        [assignmentId, targetId],
+      );
+
+      if (result.rows.length === 0) {
+        reply.status(404);
+        return {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Assignment not found" },
+        };
+      }
+
+      logger.info({ targetId, assignmentId }, "STIG assignment removed");
+      return reply.status(204).send();
+    },
+  );
+
+  // Audit All - Run audits for all enabled STIGs on a target
+  fastify.post<{
+    Params: { targetId: string };
+    Body: z.infer<typeof auditAllSchema>;
+  }>(
+    "/:targetId/audit-all",
+    {
+      schema: {
+        tags: ["STIG - Batch Audits"],
+        summary: "Run audits for all enabled STIGs on a target",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            targetId: { type: "string", format: "uuid" },
+          },
+          required: ["targetId"],
+        },
+        body: {
+          type: "object",
+          properties: {
+            definitionIds: {
+              type: "array",
+              items: { type: "string", format: "uuid" },
+              description: "Optional: specific definitions to audit (omit for all enabled)",
+            },
+            name: { type: "string", description: "Optional name for the audit group" },
+          },
+        },
+      },
+      preHandler: [fastify.requireAuth, fastify.requireRole("admin", "operator")],
+    },
+    async (request, reply) => {
+      const { targetId } = request.params;
+      const body = auditAllSchema.parse(request.body || {});
+      const userId = (request as unknown as { user: { id: string } }).user?.id;
+
+      // Verify target exists
+      const targetResult = await pool.query(
+        "SELECT id, name FROM stig.targets WHERE id = $1",
+        [targetId],
+      );
+      if (targetResult.rows.length === 0) {
+        reply.status(404);
+        return {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Target not found" },
+        };
+      }
+      const targetName = targetResult.rows[0].name;
+
+      // Get enabled definitions to audit
+      let definitionsQuery: string;
+      let definitionsParams: (string | string[])[];
+
+      if (body.definitionIds && body.definitionIds.length > 0) {
+        // Audit specific definitions (must be assigned and enabled)
+        definitionsQuery = `
+          SELECT td.definition_id, d.title as stig_title
+          FROM stig.target_definitions td
+          JOIN stig.definitions d ON td.definition_id = d.id
+          WHERE td.target_id = $1 AND td.enabled = true AND td.definition_id = ANY($2)
+        `;
+        definitionsParams = [targetId, body.definitionIds];
+      } else {
+        // Audit all enabled definitions
+        definitionsQuery = `
+          SELECT td.definition_id, d.title as stig_title
+          FROM stig.target_definitions td
+          JOIN stig.definitions d ON td.definition_id = d.id
+          WHERE td.target_id = $1 AND td.enabled = true
+        `;
+        definitionsParams = [targetId];
+      }
+
+      const definitionsResult = await pool.query(definitionsQuery, definitionsParams);
+
+      if (definitionsResult.rows.length === 0) {
+        reply.status(400);
+        return {
+          success: false,
+          error: { code: "NO_DEFINITIONS", message: "No enabled STIG definitions to audit" },
+        };
+      }
+
+      // Create audit group
+      const groupName = body.name || `Audit All - ${targetName} - ${new Date().toISOString().slice(0, 16)}`;
+      const groupResult = await pool.query(
+        `INSERT INTO stig.audit_groups (name, target_id, status, total_jobs, created_by)
+         VALUES ($1, $2, 'pending', $3, $4)
+         RETURNING id, name, target_id, status, total_jobs, completed_jobs, created_at`,
+        [groupName, targetId, definitionsResult.rows.length, userId],
+      );
+      const groupId = groupResult.rows[0].id;
+
+      // Create individual audit jobs (proxy to STIG service)
+      const token = getTokenFromRequest(request);
+      const jobs: Array<{ jobId: string; definitionId: string; stigTitle: string }> = [];
+      const jobErrors: string[] = [];
+
+      for (const row of definitionsResult.rows) {
+        try {
+          const result = await proxyToSTIGService(
+            "POST",
+            "/api/v1/stig/audits",
+            token || "",
+            {
+              target_id: targetId,
+              definition_id: row.definition_id,
+              name: `${row.stig_title} - ${targetName}`,
+              audit_group_id: groupId,
+            },
+          );
+
+          if (result.status === 200 || result.status === 201) {
+            const jobData = result.data as { data?: { id: string } };
+            if (jobData.data?.id) {
+              jobs.push({
+                jobId: jobData.data.id,
+                definitionId: row.definition_id,
+                stigTitle: row.stig_title,
+              });
+            }
+          } else {
+            jobErrors.push(`Failed to start audit for ${row.stig_title}`);
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          jobErrors.push(`Failed to start audit for ${row.stig_title}: ${msg}`);
+        }
+      }
+
+      // Update group status to running if jobs were created
+      if (jobs.length > 0) {
+        await pool.query(
+          "UPDATE stig.audit_groups SET status = 'running' WHERE id = $1",
+          [groupId],
+        );
+      } else {
+        // Mark as failed if no jobs could be created
+        await pool.query(
+          "UPDATE stig.audit_groups SET status = 'failed', completed_at = NOW() WHERE id = $1",
+          [groupId],
+        );
+      }
+
+      logger.info(
+        { targetId, groupId, jobsCreated: jobs.length, errors: jobErrors.length },
+        "Audit All initiated",
+      );
+
+      reply.status(201);
+      return {
+        success: true,
+        data: {
+          groupId,
+          groupName,
+          targetId,
+          targetName,
+          totalJobs: definitionsResult.rows.length,
+          jobsCreated: jobs.length,
+          jobs,
+          errors: jobErrors,
+        },
+      };
+    },
+  );
+};
+
+// =============================================================================
+// Audit Group Routes (STIG-13: Multi-STIG Support)
+// =============================================================================
+
+const auditGroupRoutes: FastifyPluginAsync = async (fastify) => {
+  // Get audit group by ID
+  fastify.get<{
+    Params: { groupId: string };
+  }>(
+    "/:groupId",
+    {
+      schema: {
+        tags: ["STIG - Batch Audits"],
+        summary: "Get audit group status",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            groupId: { type: "string", format: "uuid" },
+          },
+          required: ["groupId"],
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const { groupId } = request.params;
+
+      const groupResult = await pool.query(
+        `SELECT ag.id, ag.name, ag.target_id, ag.status, ag.total_jobs, ag.completed_jobs,
+                ag.created_by, ag.created_at, ag.completed_at,
+                t.name as target_name
+         FROM stig.audit_groups ag
+         JOIN stig.targets t ON ag.target_id = t.id
+         WHERE ag.id = $1`,
+        [groupId],
+      );
+
+      if (groupResult.rows.length === 0) {
+        reply.status(404);
+        return {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Audit group not found" },
+        };
+      }
+
+      const group = groupResult.rows[0];
+
+      // Get jobs in this group
+      const jobsResult = await pool.query(
+        `SELECT j.id, j.name, j.status, j.started_at, j.completed_at,
+                d.id as definition_id, d.title as stig_title
+         FROM stig.audit_jobs j
+         JOIN stig.definitions d ON j.definition_id = d.id
+         WHERE j.audit_group_id = $1
+         ORDER BY d.title`,
+        [groupId],
+      );
+
+      const progressPercent = group.total_jobs > 0
+        ? Math.round((group.completed_jobs / group.total_jobs) * 100)
+        : 0;
+
+      return {
+        success: true,
+        data: {
+          id: group.id,
+          name: group.name,
+          targetId: group.target_id,
+          targetName: group.target_name,
+          status: group.status,
+          totalJobs: group.total_jobs,
+          completedJobs: group.completed_jobs,
+          progressPercent,
+          createdBy: group.created_by,
+          createdAt: group.created_at,
+          completedAt: group.completed_at,
+          jobs: jobsResult.rows.map((job) => ({
+            id: job.id,
+            name: job.name,
+            status: job.status,
+            startedAt: job.started_at,
+            completedAt: job.completed_at,
+            definitionId: job.definition_id,
+            stigTitle: job.stig_title,
+          })),
+        },
+      };
+    },
+  );
+
+  // Get aggregated compliance summary for an audit group
+  fastify.get<{
+    Params: { groupId: string };
+  }>(
+    "/:groupId/summary",
+    {
+      schema: {
+        tags: ["STIG - Batch Audits"],
+        summary: "Get aggregated compliance summary for an audit group",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            groupId: { type: "string", format: "uuid" },
+          },
+          required: ["groupId"],
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const { groupId } = request.params;
+
+      // Get group info
+      const groupResult = await pool.query(
+        `SELECT ag.id, ag.target_id, ag.status, t.name as target_name
+         FROM stig.audit_groups ag
+         JOIN stig.targets t ON ag.target_id = t.id
+         WHERE ag.id = $1`,
+        [groupId],
+      );
+
+      if (groupResult.rows.length === 0) {
+        reply.status(404);
+        return {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Audit group not found" },
+        };
+      }
+
+      const group = groupResult.rows[0];
+
+      // Get per-STIG summaries
+      const stigSummariesResult = await pool.query(
+        `SELECT
+           j.id as job_id,
+           d.id as definition_id,
+           d.title as stig_title,
+           j.status as job_status,
+           COUNT(ar.id) as total_checks,
+           COUNT(*) FILTER (WHERE ar.status = 'pass') as passed,
+           COUNT(*) FILTER (WHERE ar.status = 'fail') as failed,
+           COUNT(*) FILTER (WHERE ar.status = 'not_applicable') as not_applicable,
+           COUNT(*) FILTER (WHERE ar.status = 'not_reviewed') as not_reviewed,
+           COUNT(*) FILTER (WHERE ar.status = 'error') as errors
+         FROM stig.audit_jobs j
+         JOIN stig.definitions d ON j.definition_id = d.id
+         LEFT JOIN stig.audit_results ar ON j.id = ar.job_id
+         WHERE j.audit_group_id = $1
+         GROUP BY j.id, d.id, d.title, j.status
+         ORDER BY d.title`,
+        [groupId],
+      );
+
+      // Calculate totals
+      let totalChecks = 0;
+      let totalPassed = 0;
+      let totalFailed = 0;
+      let totalNotApplicable = 0;
+      let totalNotReviewed = 0;
+      let totalErrors = 0;
+
+      const stigSummaries = stigSummariesResult.rows.map((row) => {
+        const checks = parseInt(row.total_checks, 10) || 0;
+        const passed = parseInt(row.passed, 10) || 0;
+        const failed = parseInt(row.failed, 10) || 0;
+        const notApplicable = parseInt(row.not_applicable, 10) || 0;
+        const notReviewed = parseInt(row.not_reviewed, 10) || 0;
+        const errors = parseInt(row.errors, 10) || 0;
+
+        totalChecks += checks;
+        totalPassed += passed;
+        totalFailed += failed;
+        totalNotApplicable += notApplicable;
+        totalNotReviewed += notReviewed;
+        totalErrors += errors;
+
+        const complianceScore = checks > 0
+          ? Math.round((passed / checks) * 100 * 10) / 10
+          : 0;
+
+        return {
+          jobId: row.job_id,
+          definitionId: row.definition_id,
+          stigTitle: row.stig_title,
+          jobStatus: row.job_status,
+          totalChecks: checks,
+          passed,
+          failed,
+          notApplicable,
+          notReviewed,
+          errors,
+          complianceScore,
+        };
+      });
+
+      const overallComplianceScore = totalChecks > 0
+        ? Math.round((totalPassed / totalChecks) * 100 * 10) / 10
+        : 0;
+
+      return {
+        success: true,
+        data: {
+          groupId: group.id,
+          targetId: group.target_id,
+          targetName: group.target_name,
+          status: group.status,
+          totalChecks,
+          passed: totalPassed,
+          failed: totalFailed,
+          notApplicable: totalNotApplicable,
+          notReviewed: totalNotReviewed,
+          errors: totalErrors,
+          complianceScore: overallComplianceScore,
+          totalStigs: stigSummaries.length,
+          stigSummaries,
+        },
+      };
+    },
+  );
+
+  // List audit groups for a target
+  fastify.get<{
+    Querystring: { targetId?: string; page?: number; limit?: number };
+  }>(
+    "/",
+    {
+      schema: {
+        tags: ["STIG - Batch Audits"],
+        summary: "List audit groups",
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: "object",
+          properties: {
+            targetId: { type: "string", format: "uuid" },
+            page: { type: "number", minimum: 1, default: 1 },
+            limit: { type: "number", minimum: 1, maximum: 100, default: 20 },
+          },
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const query = querySchema.parse(request.query);
+      const { targetId } = request.query as { targetId?: string };
+      const offset = (query.page - 1) * query.limit;
+
+      const whereClause = targetId ? "WHERE ag.target_id = $3" : "";
+      const params = targetId
+        ? [query.limit, offset, targetId]
+        : [query.limit, offset];
+
+      const countParams = targetId ? [targetId] : [];
+      const countQuery = `SELECT COUNT(*) FROM stig.audit_groups ag ${whereClause}`;
+
+      const dataQuery = `
+        SELECT ag.id, ag.name, ag.target_id, ag.status, ag.total_jobs, ag.completed_jobs,
+               ag.created_at, ag.completed_at, t.name as target_name
+        FROM stig.audit_groups ag
+        JOIN stig.targets t ON ag.target_id = t.id
+        ${whereClause}
+        ORDER BY ag.created_at DESC
+        LIMIT $1 OFFSET $2
+      `;
+
+      const [countResult, dataResult] = await Promise.all([
+        pool.query(countQuery, countParams),
+        pool.query(dataQuery, params),
+      ]);
+
+      return {
+        success: true,
+        data: dataResult.rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          targetId: row.target_id,
+          targetName: row.target_name,
+          status: row.status,
+          totalJobs: row.total_jobs,
+          completedJobs: row.completed_jobs,
+          progressPercent: row.total_jobs > 0
+            ? Math.round((row.completed_jobs / row.total_jobs) * 100)
+            : 0,
+          createdAt: row.created_at,
+          completedAt: row.completed_at,
+        })),
+        pagination: {
+          page: query.page,
+          limit: query.limit,
+          total: parseInt(countResult.rows[0].count, 10),
+          pages: Math.ceil(parseInt(countResult.rows[0].count, 10) / query.limit),
+        },
+      };
+    },
+  );
+
+  // Download combined PDF report for an audit group
+  fastify.get<{
+    Params: { groupId: string };
+  }>(
+    "/:groupId/report/pdf",
+    {
+      schema: {
+        tags: ["STIG - Batch Audits"],
+        summary: "Download combined PDF report for an audit group",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            groupId: { type: "string", format: "uuid" },
+          },
+          required: ["groupId"],
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const { groupId } = request.params;
+      const token = request.headers.authorization?.replace("Bearer ", "") || "";
+
+      try {
+        const { config } = await import("../../config");
+        const url = `${config.STIG_SERVICE_URL}/api/v1/stig/audit-groups/${groupId}/report/pdf`;
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          reply.status(response.status);
+          return { success: false, error };
+        }
+
+        // Stream the file response
+        const contentType = response.headers.get("content-type") || "application/pdf";
+        const contentDisposition = response.headers.get("content-disposition") || `attachment; filename="combined_report.pdf"`;
+
+        reply.header("Content-Type", contentType);
+        reply.header("Content-Disposition", contentDisposition);
+
+        return reply.send(response.body);
+      } catch (error) {
+        reply.status(500);
+        return {
+          success: false,
+          error: { code: "PROXY_ERROR", message: "Failed to download report" },
+        };
+      }
+    },
+  );
+
+  // Download combined CKL ZIP for an audit group
+  fastify.get<{
+    Params: { groupId: string };
+  }>(
+    "/:groupId/report/ckl",
+    {
+      schema: {
+        tags: ["STIG - Batch Audits"],
+        summary: "Download CKL checklists ZIP for an audit group",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            groupId: { type: "string", format: "uuid" },
+          },
+          required: ["groupId"],
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const { groupId } = request.params;
+      const token = request.headers.authorization?.replace("Bearer ", "") || "";
+
+      try {
+        const { config } = await import("../../config");
+        const url = `${config.STIG_SERVICE_URL}/api/v1/stig/audit-groups/${groupId}/report/ckl`;
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          reply.status(response.status);
+          return { success: false, error };
+        }
+
+        // Stream the file response
+        const contentType = response.headers.get("content-type") || "application/zip";
+        const contentDisposition = response.headers.get("content-disposition") || `attachment; filename="checklists.zip"`;
+
+        reply.header("Content-Type", contentType);
+        reply.header("Content-Disposition", contentDisposition);
+
+        return reply.send(response.body);
+      } catch (error) {
+        reply.status(500);
+        return {
+          success: false,
+          error: { code: "PROXY_ERROR", message: "Failed to download checklists" },
+        };
+      }
+    },
+  );
+};
+
+// =============================================================================
 // Audit Routes (Proxy to STIG Service)
 // =============================================================================
 
@@ -1824,13 +3161,15 @@ const targetRoutes: FastifyPluginAsync = async (fastify) => {
         });
         form.append("definition_id", definitionId);
 
+        // Convert form-data to buffer for native fetch compatibility
+        const formBuffer = form.getBuffer();
         const response = await fetch(url, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
             ...form.getHeaders(),
           },
-          body: form as unknown as BodyInit,
+          body: formBuffer,
         });
 
         const responseData = await response.json();

@@ -86,6 +86,81 @@ export interface SSHCredentialInput {
   sudoUser?: string;
 }
 
+// STIG-13: Target-STIG Assignment types
+export interface TargetDefinition {
+  id: string;
+  targetId: string;
+  definitionId: string;
+  isPrimary: boolean;
+  enabled: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Joined from definition
+  stigId?: string;
+  stigTitle?: string;
+  stigVersion?: string;
+  rulesCount?: number;
+  // Compliance info (when includeCompliance=true)
+  lastAuditDate?: string;
+  lastAuditStatus?: string;
+  complianceScore?: number;
+  passed?: number;
+  failed?: number;
+  notReviewed?: number;
+}
+
+export interface AuditGroup {
+  id: string;
+  name: string;
+  targetId: string;
+  targetName?: string;
+  status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  totalJobs: number;
+  completedJobs: number;
+  progressPercent: number;
+  createdBy?: string;
+  createdAt: string;
+  completedAt?: string;
+  jobs?: Array<{
+    id: string;
+    name: string;
+    status: string;
+    startedAt?: string;
+    completedAt?: string;
+    definitionId: string;
+    stigTitle: string;
+  }>;
+}
+
+export interface AuditGroupSummary {
+  groupId: string;
+  targetId: string;
+  targetName: string;
+  status: string;
+  totalChecks: number;
+  passed: number;
+  failed: number;
+  notApplicable: number;
+  notReviewed: number;
+  errors: number;
+  complianceScore: number;
+  totalStigs: number;
+  stigSummaries: Array<{
+    jobId: string;
+    definitionId: string;
+    stigTitle: string;
+    jobStatus: string;
+    totalChecks: number;
+    passed: number;
+    failed: number;
+    notApplicable: number;
+    notReviewed: number;
+    errors: number;
+    complianceScore: number;
+  }>;
+}
+
 interface STIGState {
   targets: Target[];
   selectedTarget: Target | null;
@@ -96,6 +171,9 @@ interface STIGState {
   dashboard: STIGDashboard | null;
   importHistory: ImportHistoryEntry[];
   sshCredentials: SSHCredential[];
+  // STIG-13: Target-STIG assignments
+  targetDefinitions: TargetDefinition[];
+  auditGroups: AuditGroup[];
   isLoading: boolean;
   isUploading: boolean;
   isImporting: boolean;
@@ -123,6 +201,39 @@ interface STIGState {
     data: Partial<SSHCredentialInput>,
   ) => Promise<SSHCredential>;
   deleteSSHCredential: (id: string) => Promise<void>;
+  // STIG-13: Target-STIG Assignment methods
+  fetchTargetDefinitions: (
+    targetId: string,
+    includeCompliance?: boolean,
+  ) => Promise<TargetDefinition[]>;
+  assignSTIG: (
+    targetId: string,
+    definitionId: string,
+    isPrimary?: boolean,
+  ) => Promise<TargetDefinition>;
+  bulkAssignSTIGs: (
+    targetId: string,
+    definitionIds: string[],
+    primaryId?: string,
+  ) => Promise<{ assigned: number; skipped: number; errors: string[] }>;
+  updateAssignment: (
+    targetId: string,
+    assignmentId: string,
+    data: { isPrimary?: boolean; enabled?: boolean; notes?: string },
+  ) => Promise<TargetDefinition>;
+  removeAssignment: (targetId: string, assignmentId: string) => Promise<void>;
+  startAuditAll: (
+    targetId: string,
+    definitionIds?: string[],
+    name?: string,
+  ) => Promise<AuditGroup>;
+  fetchAuditGroups: (
+    targetId?: string,
+    page?: number,
+    limit?: number,
+  ) => Promise<{ data: AuditGroup[]; total: number }>;
+  fetchAuditGroup: (groupId: string) => Promise<AuditGroup>;
+  fetchAuditGroupSummary: (groupId: string) => Promise<AuditGroupSummary>;
 }
 
 export const useSTIGStore = create<STIGState>((set) => ({
@@ -135,6 +246,9 @@ export const useSTIGStore = create<STIGState>((set) => ({
   dashboard: null,
   importHistory: [],
   sshCredentials: [],
+  // STIG-13: Target-STIG assignments
+  targetDefinitions: [],
+  auditGroups: [],
   isLoading: false,
   isUploading: false,
   isImporting: false,
@@ -483,6 +597,220 @@ export const useSTIGStore = create<STIGState>((set) => ({
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to delete SSH credential";
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  // STIG-13: Target-STIG Assignment methods
+  fetchTargetDefinitions: async (
+    targetId: string,
+    includeCompliance = false,
+  ) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.get<{ data: TargetDefinition[] }>(
+        `/api/v1/stig/targets/${targetId}/definitions`,
+        { params: { includeCompliance } },
+      );
+      set({ targetDefinitions: response.data.data, isLoading: false });
+      return response.data.data;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to fetch target STIGs";
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  assignSTIG: async (
+    targetId: string,
+    definitionId: string,
+    isPrimary = false,
+  ) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.post<{ data: TargetDefinition }>(
+        `/api/v1/stig/targets/${targetId}/definitions`,
+        { definitionId, isPrimary, enabled: true },
+      );
+      const assignment = response.data.data;
+      set((state) => ({
+        targetDefinitions: [...state.targetDefinitions, assignment],
+        isLoading: false,
+      }));
+      return assignment;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to assign STIG";
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  bulkAssignSTIGs: async (
+    targetId: string,
+    definitionIds: string[],
+    primaryId?: string,
+  ) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.post<{
+        data: { assigned: number; skipped: number; errors: string[] };
+      }>(`/api/v1/stig/targets/${targetId}/definitions/bulk`, {
+        definitionIds,
+        primaryId,
+      });
+      // Refresh the assignments list
+      const assignmentsResponse = await api.get<{ data: TargetDefinition[] }>(
+        `/api/v1/stig/targets/${targetId}/definitions`,
+      );
+      set({
+        targetDefinitions: assignmentsResponse.data.data,
+        isLoading: false,
+      });
+      return response.data.data;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to bulk assign STIGs";
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  updateAssignment: async (
+    targetId: string,
+    assignmentId: string,
+    data: { isPrimary?: boolean; enabled?: boolean; notes?: string },
+  ) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.patch<{ data: TargetDefinition }>(
+        `/api/v1/stig/targets/${targetId}/definitions/${assignmentId}`,
+        data,
+      );
+      const assignment = response.data.data;
+      set((state) => ({
+        targetDefinitions: state.targetDefinitions.map((td) =>
+          td.id === assignmentId ? { ...td, ...assignment } : td,
+        ),
+        isLoading: false,
+      }));
+      return assignment;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to update assignment";
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  removeAssignment: async (targetId: string, assignmentId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await api.delete(
+        `/api/v1/stig/targets/${targetId}/definitions/${assignmentId}`,
+      );
+      set((state) => ({
+        targetDefinitions: state.targetDefinitions.filter(
+          (td) => td.id !== assignmentId,
+        ),
+        isLoading: false,
+      }));
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to remove assignment";
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  startAuditAll: async (
+    targetId: string,
+    definitionIds?: string[],
+    name?: string,
+  ) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.post<{ data: AuditGroup }>(
+        `/api/v1/stig/targets/${targetId}/audit-all`,
+        { definitionIds, name },
+      );
+      const auditGroup = response.data.data;
+      set((state) => ({
+        auditGroups: [...state.auditGroups, auditGroup],
+        isLoading: false,
+      }));
+      return auditGroup;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to start audit all";
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  fetchAuditGroups: async (targetId?: string, page = 1, limit = 20) => {
+    set({ isLoading: true, error: null });
+    try {
+      const params = new URLSearchParams();
+      if (targetId) params.append("targetId", targetId);
+      params.append("page", page.toString());
+      params.append("limit", limit.toString());
+
+      const response = await api.get<{
+        data: AuditGroup[];
+        pagination: { total: number };
+      }>(`/api/v1/stig/audit-groups?${params.toString()}`);
+
+      set({ auditGroups: response.data.data, isLoading: false });
+      return {
+        data: response.data.data,
+        total: response.data.pagination.total,
+      };
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to fetch audit groups";
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  fetchAuditGroup: async (groupId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.get<{ data: AuditGroup }>(
+        `/api/v1/stig/audit-groups/${groupId}`,
+      );
+      const auditGroup = response.data.data;
+      set((state) => ({
+        auditGroups: state.auditGroups.some((ag) => ag.id === groupId)
+          ? state.auditGroups.map((ag) => (ag.id === groupId ? auditGroup : ag))
+          : [...state.auditGroups, auditGroup],
+        isLoading: false,
+      }));
+      return auditGroup;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to fetch audit group";
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  fetchAuditGroupSummary: async (groupId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.get<{ data: AuditGroupSummary }>(
+        `/api/v1/stig/audit-groups/${groupId}/summary`,
+      );
+      set({ isLoading: false });
+      return response.data.data;
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to fetch audit group summary";
       set({ error: message, isLoading: false });
       throw err;
     }

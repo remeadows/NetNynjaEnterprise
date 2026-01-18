@@ -9,6 +9,7 @@ export { STIGAssetsPage as AssetsPage } from "./pages/AssetsPage";
 export { STIGCompliancePage as CompliancePage } from "./pages/CompliancePage";
 export { STIGLibraryPage as LibraryPage } from "./pages/LibraryPage";
 export { STIGCredentialsPage as CredentialsPage } from "./pages/CredentialsPage";
+export { STIGAuditProgressPage as AuditProgressPage } from "./pages/AuditProgressPage";
 
 // Module metadata
 export const stigModuleConfig = {
@@ -22,5 +23,6 @@ export const stigModuleConfig = {
     { path: "/stig/benchmarks", label: "Benchmarks", icon: "document-text" },
     { path: "/stig/assets", label: "Assets", icon: "server" },
     { path: "/stig/credentials", label: "Credentials", icon: "key" },
+    { path: "/stig/audits", label: "Audit Progress", icon: "clock" },
   ],
 };

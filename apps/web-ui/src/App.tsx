@@ -30,6 +30,7 @@ import { STIGAssetsPage } from "./modules/stig/pages/AssetsPage";
 import { STIGCompliancePage } from "./modules/stig/pages/CompliancePage";
 import { STIGLibraryPage } from "./modules/stig/pages/LibraryPage";
 import { STIGCredentialsPage } from "./modules/stig/pages/CredentialsPage";
+import { STIGAuditProgressPage } from "./modules/stig/pages/AuditProgressPage";
 
 // Syslog module
 import { SyslogEventsPage } from "./modules/syslog/pages/EventsPage";
@@ -106,6 +107,7 @@ function App() {
             <Route path="assets" element={<STIGAssetsPage />} />
             <Route path="credentials" element={<STIGCredentialsPage />} />
             <Route path="compliance" element={<STIGCompliancePage />} />
+            <Route path="audits" element={<STIGAuditProgressPage />} />
           </Route>
 
           {/* Syslog Module */}

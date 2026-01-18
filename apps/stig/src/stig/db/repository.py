@@ -19,6 +19,12 @@ from ..models import (
     AuditResult,
     AuditResultCreate,
     CheckStatus,
+    TargetDefinition,
+    TargetDefinitionCreate,
+    TargetDefinitionUpdate,
+    TargetDefinitionWithCompliance,
+    AuditGroup,
+    AuditGroupCreate,
 )
 from .connection import get_pool
 
@@ -371,6 +377,50 @@ class DefinitionRepository:
         async with pool.acquire() as conn:
             return await conn.fetchval("SELECT COUNT(*) FROM stig.definitions")
 
+    @staticmethod
+    async def get_rules(definition_id: str) -> list[dict]:
+        """Get STIG rules for a definition from definition_rules table.
+
+        Args:
+            definition_id: The definition ID
+
+        Returns:
+            List of rule dictionaries with keys:
+            vuln_id, rule_id, title, severity, check_text, fix_text
+        """
+        pool = get_pool()
+
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT
+                    rule_id,
+                    title,
+                    severity,
+                    description,
+                    fix_text,
+                    check_text
+                FROM stig.definition_rules
+                WHERE definition_id = $1
+                ORDER BY rule_id
+                """,
+                definition_id,
+            )
+
+        rules = []
+        for row in rows:
+            rules.append({
+                "vuln_id": row["rule_id"],  # Use rule_id as vuln_id
+                "rule_id": row["rule_id"],
+                "title": row["title"] or "",
+                "severity": row["severity"] or "medium",
+                "check_text": row["check_text"] or "",
+                "fix_text": row["fix_text"] or "",
+                "description": row["description"] or "",
+            })
+
+        return rules
+
 
 class AuditJobRepository:
     """Repository for audit job operations."""
@@ -410,7 +460,7 @@ class AuditJobRepository:
             offset = (page - 1) * per_page
             query = f"""
                 SELECT id, name, target_id, definition_id, status, started_at,
-                       completed_at, created_by, error_message, created_at
+                       completed_at, created_by, error_message, created_at, audit_group_id
                 FROM stig.audit_jobs
                 WHERE {where_clause}
                 ORDER BY created_at DESC
@@ -432,6 +482,7 @@ class AuditJobRepository:
                 created_by=str(row["created_by"]) if row["created_by"] else None,
                 error_message=row["error_message"],
                 created_at=row["created_at"],
+                audit_group_id=str(row["audit_group_id"]) if row["audit_group_id"] else None,
             )
             for row in rows
         ]
@@ -447,7 +498,7 @@ class AuditJobRepository:
             row = await conn.fetchrow(
                 """
                 SELECT id, name, target_id, definition_id, status, started_at,
-                       completed_at, created_by, error_message, created_at
+                       completed_at, created_by, error_message, created_at, audit_group_id
                 FROM stig.audit_jobs
                 WHERE id = $1
                 """,
@@ -468,6 +519,7 @@ class AuditJobRepository:
             created_by=str(row["created_by"]) if row["created_by"] else None,
             error_message=row["error_message"],
             created_at=row["created_at"],
+            audit_group_id=str(row["audit_group_id"]) if row["audit_group_id"] else None,
         )
 
     @staticmethod
@@ -483,18 +535,19 @@ class AuditJobRepository:
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                INSERT INTO stig.audit_jobs (name, target_id, definition_id, created_by)
-                VALUES ($1, $2, $3, $4)
+                INSERT INTO stig.audit_jobs (name, target_id, definition_id, created_by, audit_group_id)
+                VALUES ($1, $2, $3, $4, $5)
                 RETURNING id, name, target_id, definition_id, status, started_at,
-                          completed_at, created_by, error_message, created_at
+                          completed_at, created_by, error_message, created_at, audit_group_id
                 """,
                 name,
                 data.target_id,
                 data.definition_id,
                 created_by,
+                data.audit_group_id,
             )
 
-        logger.info("audit_job_created", job_id=str(row["id"]), name=name)
+        logger.info("audit_job_created", job_id=str(row["id"]), name=name, audit_group_id=data.audit_group_id)
 
         return AuditJob(
             id=str(row["id"]),
@@ -507,6 +560,7 @@ class AuditJobRepository:
             created_by=str(row["created_by"]) if row["created_by"] else None,
             error_message=row["error_message"],
             created_at=row["created_at"],
+            audit_group_id=str(row["audit_group_id"]) if row["audit_group_id"] else None,
         )
 
     @staticmethod
@@ -777,3 +831,415 @@ class AuditResultRepository:
                     breakdown[sev]["failed"] = row["count"]
 
         return breakdown
+
+
+class TargetDefinitionRepository:
+    """Repository for target-STIG assignment operations."""
+
+    @staticmethod
+    async def list_by_target(
+        target_id: str,
+        enabled_only: bool = False,
+    ) -> list[TargetDefinitionWithCompliance]:
+        """List all STIG definitions assigned to a target with compliance info."""
+        pool = get_pool()
+
+        enabled_filter = "AND td.enabled = true" if enabled_only else ""
+
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                f"""
+                SELECT
+                    td.id,
+                    td.target_id,
+                    td.definition_id,
+                    td.is_primary,
+                    td.enabled,
+                    td.notes,
+                    td.created_at,
+                    td.updated_at,
+                    d.stig_id,
+                    d.title as stig_title,
+                    d.version as stig_version,
+                    (SELECT COUNT(*) FROM stig.definition_rules WHERE definition_id = d.id) as rules_count,
+                    -- Last audit info
+                    (
+                        SELECT aj.completed_at
+                        FROM stig.audit_jobs aj
+                        WHERE aj.target_id = td.target_id
+                          AND aj.definition_id = td.definition_id
+                          AND aj.status = 'completed'
+                        ORDER BY aj.completed_at DESC
+                        LIMIT 1
+                    ) as last_audit_date,
+                    (
+                        SELECT aj.status
+                        FROM stig.audit_jobs aj
+                        WHERE aj.target_id = td.target_id
+                          AND aj.definition_id = td.definition_id
+                        ORDER BY aj.created_at DESC
+                        LIMIT 1
+                    ) as last_audit_status,
+                    -- Compliance from last completed audit
+                    (
+                        SELECT
+                            CASE WHEN COUNT(*) > 0
+                                THEN (COUNT(*) FILTER (WHERE ar.status = 'pass')::float / COUNT(*)::float) * 100
+                                ELSE NULL
+                            END
+                        FROM stig.audit_results ar
+                        JOIN stig.audit_jobs aj ON ar.job_id = aj.id
+                        WHERE aj.target_id = td.target_id
+                          AND aj.definition_id = td.definition_id
+                          AND aj.status = 'completed'
+                          AND aj.id = (
+                              SELECT id FROM stig.audit_jobs
+                              WHERE target_id = td.target_id
+                                AND definition_id = td.definition_id
+                                AND status = 'completed'
+                              ORDER BY completed_at DESC LIMIT 1
+                          )
+                    ) as compliance_score
+                FROM stig.target_definitions td
+                JOIN stig.definitions d ON td.definition_id = d.id
+                WHERE td.target_id = $1 {enabled_filter}
+                ORDER BY td.is_primary DESC, d.title ASC
+                """,
+                target_id,
+            )
+
+        return [
+            TargetDefinitionWithCompliance(
+                id=str(row["id"]),
+                target_id=str(row["target_id"]),
+                definition_id=str(row["definition_id"]),
+                is_primary=row["is_primary"],
+                enabled=row["enabled"],
+                notes=row["notes"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+                stig_id=row["stig_id"],
+                stig_title=row["stig_title"],
+                stig_version=row["stig_version"],
+                rules_count=row["rules_count"],
+                last_audit_date=row["last_audit_date"],
+                last_audit_status=row["last_audit_status"],
+                compliance_score=row["compliance_score"],
+            )
+            for row in rows
+        ]
+
+    @staticmethod
+    async def get(target_id: str, definition_id: str) -> TargetDefinition | None:
+        """Get a specific target-STIG assignment."""
+        pool = get_pool()
+
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT
+                    td.id, td.target_id, td.definition_id,
+                    td.is_primary, td.enabled, td.notes,
+                    td.created_at, td.updated_at,
+                    d.stig_id, d.title as stig_title, d.version as stig_version,
+                    (SELECT COUNT(*) FROM stig.definition_rules WHERE definition_id = d.id) as rules_count
+                FROM stig.target_definitions td
+                JOIN stig.definitions d ON td.definition_id = d.id
+                WHERE td.target_id = $1 AND td.definition_id = $2
+                """,
+                target_id,
+                definition_id,
+            )
+
+        if not row:
+            return None
+
+        return TargetDefinition(
+            id=str(row["id"]),
+            target_id=str(row["target_id"]),
+            definition_id=str(row["definition_id"]),
+            is_primary=row["is_primary"],
+            enabled=row["enabled"],
+            notes=row["notes"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            stig_id=row["stig_id"],
+            stig_title=row["stig_title"],
+            stig_version=row["stig_version"],
+            rules_count=row["rules_count"],
+        )
+
+    @staticmethod
+    async def create(target_id: str, data: TargetDefinitionCreate) -> TargetDefinition:
+        """Create a new target-STIG assignment."""
+        pool = get_pool()
+
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO stig.target_definitions
+                    (target_id, definition_id, is_primary, enabled, notes)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING id, target_id, definition_id, is_primary, enabled, notes, created_at, updated_at
+                """,
+                target_id,
+                data.definition_id,
+                data.is_primary,
+                data.enabled,
+                data.notes,
+            )
+
+        return TargetDefinition(
+            id=str(row["id"]),
+            target_id=str(row["target_id"]),
+            definition_id=str(row["definition_id"]),
+            is_primary=row["is_primary"],
+            enabled=row["enabled"],
+            notes=row["notes"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    @staticmethod
+    async def update(
+        target_id: str,
+        definition_id: str,
+        data: TargetDefinitionUpdate,
+    ) -> TargetDefinition | None:
+        """Update a target-STIG assignment."""
+        pool = get_pool()
+
+        # Build dynamic update
+        updates = []
+        params: list[Any] = []
+        param_idx = 1
+
+        if data.is_primary is not None:
+            updates.append(f"is_primary = ${param_idx}")
+            params.append(data.is_primary)
+            param_idx += 1
+
+        if data.enabled is not None:
+            updates.append(f"enabled = ${param_idx}")
+            params.append(data.enabled)
+            param_idx += 1
+
+        if data.notes is not None:
+            updates.append(f"notes = ${param_idx}")
+            params.append(data.notes)
+            param_idx += 1
+
+        if not updates:
+            return await TargetDefinitionRepository.get(target_id, definition_id)
+
+        updates.append("updated_at = NOW()")
+        params.extend([target_id, definition_id])
+
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                f"""
+                UPDATE stig.target_definitions
+                SET {", ".join(updates)}
+                WHERE target_id = ${param_idx} AND definition_id = ${param_idx + 1}
+                RETURNING id, target_id, definition_id, is_primary, enabled, notes, created_at, updated_at
+                """,
+                *params,
+            )
+
+        if not row:
+            return None
+
+        return TargetDefinition(
+            id=str(row["id"]),
+            target_id=str(row["target_id"]),
+            definition_id=str(row["definition_id"]),
+            is_primary=row["is_primary"],
+            enabled=row["enabled"],
+            notes=row["notes"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    @staticmethod
+    async def delete(target_id: str, definition_id: str) -> bool:
+        """Remove a target-STIG assignment."""
+        pool = get_pool()
+
+        async with pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                DELETE FROM stig.target_definitions
+                WHERE target_id = $1 AND definition_id = $2
+                """,
+                target_id,
+                definition_id,
+            )
+
+        return result == "DELETE 1"
+
+    @staticmethod
+    async def bulk_assign(
+        target_id: str,
+        definition_ids: list[str],
+        primary_id: str | None = None,
+    ) -> tuple[int, int]:
+        """Bulk assign multiple STIGs to a target. Returns (assigned, skipped)."""
+        pool = get_pool()
+        assigned = 0
+        skipped = 0
+
+        async with pool.acquire() as conn:
+            for def_id in definition_ids:
+                try:
+                    is_primary = (def_id == primary_id) if primary_id else False
+                    await conn.execute(
+                        """
+                        INSERT INTO stig.target_definitions
+                            (target_id, definition_id, is_primary, enabled)
+                        VALUES ($1, $2, $3, true)
+                        ON CONFLICT (target_id, definition_id) DO NOTHING
+                        """,
+                        target_id,
+                        def_id,
+                        is_primary,
+                    )
+                    assigned += 1
+                except Exception:
+                    skipped += 1
+
+        return assigned, skipped
+
+
+class AuditGroupRepository:
+    """Repository for audit group operations."""
+
+    @staticmethod
+    async def create(data: AuditGroupCreate, user_id: str | None = None) -> AuditGroup:
+        """Create a new audit group."""
+        pool = get_pool()
+
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO stig.audit_groups (name, target_id, created_by)
+                VALUES ($1, $2, $3)
+                RETURNING id, name, target_id, status, total_jobs, completed_jobs,
+                          created_by, created_at, completed_at
+                """,
+                data.name,
+                data.target_id,
+                user_id,
+            )
+
+        return AuditGroup(
+            id=str(row["id"]),
+            name=row["name"],
+            target_id=str(row["target_id"]),
+            status=AuditStatus(row["status"]),
+            total_jobs=row["total_jobs"],
+            completed_jobs=row["completed_jobs"],
+            created_by=str(row["created_by"]) if row["created_by"] else None,
+            created_at=row["created_at"],
+            completed_at=row["completed_at"],
+        )
+
+    @staticmethod
+    async def get_by_id(group_id: str) -> AuditGroup | None:
+        """Get an audit group by ID."""
+        pool = get_pool()
+
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT id, name, target_id, status, total_jobs, completed_jobs,
+                       created_by, created_at, completed_at
+                FROM stig.audit_groups
+                WHERE id = $1
+                """,
+                group_id,
+            )
+
+        if not row:
+            return None
+
+        return AuditGroup(
+            id=str(row["id"]),
+            name=row["name"],
+            target_id=str(row["target_id"]),
+            status=AuditStatus(row["status"]),
+            total_jobs=row["total_jobs"],
+            completed_jobs=row["completed_jobs"],
+            created_by=str(row["created_by"]) if row["created_by"] else None,
+            created_at=row["created_at"],
+            completed_at=row["completed_at"],
+        )
+
+    @staticmethod
+    async def get_jobs(group_id: str) -> list[dict]:
+        """Get all audit jobs in a group."""
+        pool = get_pool()
+
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT
+                    aj.id, aj.name, aj.status, aj.started_at, aj.completed_at,
+                    aj.definition_id, d.stig_id, d.title as stig_title
+                FROM stig.audit_jobs aj
+                JOIN stig.definitions d ON aj.definition_id = d.id
+                WHERE aj.audit_group_id = $1
+                ORDER BY d.title
+                """,
+                group_id,
+            )
+
+        return [
+            {
+                "id": str(row["id"]),
+                "name": row["name"],
+                "status": row["status"],
+                "started_at": row["started_at"],
+                "completed_at": row["completed_at"],
+                "definition_id": str(row["definition_id"]),
+                "stig_id": row["stig_id"],
+                "stig_title": row["stig_title"],
+            }
+            for row in rows
+        ]
+
+    @staticmethod
+    async def list_by_target(
+        target_id: str,
+        limit: int = 10,
+    ) -> list[AuditGroup]:
+        """List recent audit groups for a target."""
+        pool = get_pool()
+
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, name, target_id, status, total_jobs, completed_jobs,
+                       created_by, created_at, completed_at
+                FROM stig.audit_groups
+                WHERE target_id = $1
+                ORDER BY created_at DESC
+                LIMIT $2
+                """,
+                target_id,
+                limit,
+            )
+
+        return [
+            AuditGroup(
+                id=str(row["id"]),
+                name=row["name"],
+                target_id=str(row["target_id"]),
+                status=AuditStatus(row["status"]),
+                total_jobs=row["total_jobs"],
+                completed_jobs=row["completed_jobs"],
+                created_by=str(row["created_by"]) if row["created_by"] else None,
+                created_at=row["created_at"],
+                completed_at=row["completed_at"],
+            )
+            for row in rows
+        ]

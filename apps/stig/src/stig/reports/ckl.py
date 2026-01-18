@@ -1,5 +1,6 @@
 """CKL (Checklist) export functionality for STIG audit results."""
 
+import re
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +22,31 @@ from ..models import (
 
 logger = get_logger(__name__)
 
+# Type alias for rule details dictionary
+RuleDetailsDict = dict[str, dict[str, Any]]
+
+
+def extract_vuln_discussion(description: str) -> str:
+    """Extract the VulnDiscussion content from STIG description XML.
+
+    Args:
+        description: Raw description that may contain XML tags
+
+    Returns:
+        Clean description text
+    """
+    if not description:
+        return ""
+
+    # Try to extract content from <VulnDiscussion> tags
+    match = re.search(r'<VulnDiscussion>(.*?)</VulnDiscussion>', description, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+
+    # If no VulnDiscussion tag, strip any XML-like tags
+    cleaned = re.sub(r'<[^>]+>', '', description)
+    return cleaned.strip()
+
 
 # Map internal status to CKL status values
 CKL_STATUS_MAP = {
@@ -37,7 +63,7 @@ class CKLExporter:
 
     def __init__(self) -> None:
         """Initialize CKL exporter."""
-        pass
+        self._rule_details: RuleDetailsDict = {}
 
     def export(
         self,
@@ -46,6 +72,7 @@ class CKLExporter:
         definition: STIGDefinition,
         results: list[AuditResult],
         output_path: Path,
+        rule_details: RuleDetailsDict | None = None,
     ) -> Path:
         """Export audit results to CKL format.
 
@@ -55,10 +82,13 @@ class CKLExporter:
             definition: STIG definition used
             results: Audit results
             output_path: Path to write CKL file
+            rule_details: Optional dict mapping rule_id to rule info (description, fix_text, check_text)
 
         Returns:
             Path to the generated CKL file
         """
+        self._rule_details = rule_details or {}
+
         # Build CKL XML structure
         root = ET.Element("CHECKLIST")
 
@@ -138,8 +168,13 @@ class CKLExporter:
         definition: STIGDefinition,
     ) -> None:
         """Add vulnerability (check result) data to CKL."""
-        # Get rule details from definition if available
+        # Get rule details from rule_details dict (populated from database)
+        # Fall back to xccdf_content for backwards compatibility
         rule_data = self._get_rule_data(result.rule_id, definition)
+
+        # Extract clean description from VulnDiscussion tags
+        raw_description = rule_data.get("description", "")
+        clean_description = extract_vuln_discussion(raw_description)
 
         # Add STIG_DATA elements
         stig_data_items = [
@@ -149,10 +184,10 @@ class CKLExporter:
             ("Rule_ID", result.rule_id),
             ("Rule_Ver", rule_data.get("version", "")),
             ("Rule_Title", result.title or ""),
-            ("Vuln_Discuss", rule_data.get("description", "")),
+            ("Vuln_Discuss", clean_description),
             ("IA_Controls", ""),
-            ("Check_Content", rule_data.get("check_content", "")),
-            ("Fix_Text", rule_data.get("fix_content", "")),
+            ("Check_Content", rule_data.get("check_text", rule_data.get("check_content", ""))),
+            ("Fix_Text", rule_data.get("fix_text", rule_data.get("fix_content", ""))),
             ("False_Positives", ""),
             ("False_Negatives", ""),
             ("Documentable", "false"),
@@ -198,7 +233,17 @@ class CKLExporter:
         sev_justification.text = ""
 
     def _get_rule_data(self, rule_id: str, definition: STIGDefinition) -> dict[str, Any]:
-        """Get rule details from definition XCCDF content."""
+        """Get rule details from rule_details dict or definition XCCDF content.
+
+        Priority:
+        1. self._rule_details (populated from definition_rules table)
+        2. definition.xccdf_content (legacy fallback)
+        """
+        # First check rule_details dict (from database)
+        if rule_id in self._rule_details:
+            return self._rule_details[rule_id]
+
+        # Fallback to xccdf_content for backwards compatibility
         if not definition.xccdf_content or "rules" not in definition.xccdf_content:
             return {}
 

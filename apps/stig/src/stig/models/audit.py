@@ -43,6 +43,7 @@ class AuditJobCreate(BaseModel):
     name: Annotated[str | None, Field(min_length=1, max_length=255)] = None
     target_id: str
     definition_id: str
+    audit_group_id: str | None = None  # STIG-13: Multi-STIG batch audit support
 
 
 class AuditJob(AuditJobBase):
@@ -58,6 +59,7 @@ class AuditJob(AuditJobBase):
     total_checks: int = 0
     completed_checks: int = 0
     created_at: datetime
+    audit_group_id: str | None = None  # STIG-13: Multi-STIG batch audit support
 
     class Config:
         from_attributes = True

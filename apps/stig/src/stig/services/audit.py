@@ -59,6 +59,7 @@ class AuditService:
         definition_id: str,
         name: str | None = None,
         created_by: str | None = None,
+        audit_group_id: str | None = None,
     ) -> AuditJob:
         """Start a new audit job.
 
@@ -67,6 +68,7 @@ class AuditService:
             definition_id: ID of the STIG definition to use
             name: Optional name for the audit job
             created_by: User ID who started the audit
+            audit_group_id: Optional audit group ID for batch audits (STIG-13)
 
         Returns:
             Created audit job
@@ -92,6 +94,7 @@ class AuditService:
             name=name,
             target_id=target_id,
             definition_id=definition_id,
+            audit_group_id=audit_group_id,
         )
         job = await AuditJobRepository.create(job_data, created_by)
 
