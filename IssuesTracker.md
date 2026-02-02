@@ -51,6 +51,38 @@
 
 ---
 
+### APP-019: Auth Refresh Invalid Token Returns 200 (E2E Failure)
+
+**Status**: 🔴 Open - Test Failure
+**Priority**: 🔴 Critical - CI/E2E Blocker
+**Detected**: 2026-01-31 06:42 UTC (Codex E2E run)
+**Engineer**: TBD
+
+**Issue**: Refresh token endpoint accepts invalid token and returns 200 instead of 401.
+
+**Failed Test**:
+
+- `tests/e2e/test_01_authentication.py::TestTokenRefresh::test_refresh_with_invalid_token_returns_401`
+
+**Observed Behavior**:
+
+- `POST /api/v1/auth/refresh` returns **200 OK** for invalid refresh token
+- Expected **401 Unauthorized**
+
+**Impact**:
+
+- E2E suite fails (auth regression)
+- Potential security/auth validation gap for refresh token verification
+
+**Next Steps**:
+
+1. Inspect auth-service refresh token verification logic
+2. Ensure invalid/expired refresh tokens return 401
+3. Add/adjust unit tests around refresh validation
+4. Rerun quick E2E (`test_01_authentication.py`, `test_02_gateway.py`)
+
+---
+
 ### UI-017: React Router v7 Migration Warnings
 
 **Status**: 🟡 Open - Future Compatibility
