@@ -115,5 +115,5 @@ const lokiLoggingPlugin: FastifyPluginAsync<LokiLoggingOptions> = async (
 
 export default fp(lokiLoggingPlugin, {
   name: "loki-logging",
-  fastify: "4.x",
+  fastify: "5.x",
 });

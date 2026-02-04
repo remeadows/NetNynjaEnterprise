@@ -3395,10 +3395,13 @@ const auditRoutes: FastifyPluginAsync = async (fastify) => {
       const body = auditJobSchema.parse(request.body);
 
       // Convert camelCase to snake_case for Python service
+      // Note: FastAPI expects body wrapped in "data" field when parameter is named "data"
       const pythonBody = {
-        target_id: body.targetId,
-        definition_id: body.definitionId,
-        name: body.name,
+        data: {
+          target_id: body.targetId,
+          definition_id: body.definitionId,
+          name: body.name,
+        },
       };
 
       try {

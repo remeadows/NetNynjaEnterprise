@@ -117,5 +117,5 @@ const errorHandlerPlugin: FastifyPluginAsync = async (fastify) => {
 
 export default fp(errorHandlerPlugin, {
   name: "error-handler",
-  fastify: "4.x",
+  fastify: "5.x",
 });

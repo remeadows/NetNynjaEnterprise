@@ -2,9 +2,12 @@
 # Multi-stage build for development and production
 
 # ============================================
-# Base stage with Python dependencies
+# Base stage with Python 3.13 (security update)
 # ============================================
-FROM python:3.11-slim-bookworm AS base
+FROM python:3.13-slim-bookworm AS base
+
+# Security: Update system packages
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -67,7 +70,7 @@ CMD ["python", "-m", "syslog.forwarder"]
 # ============================================
 # Production stage
 # ============================================
-FROM python:3.11-slim-bookworm AS production
+FROM python:3.13-slim-bookworm AS production
 
 WORKDIR /app
 
@@ -77,7 +80,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from base
-COPY --from=base /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=base /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=base /usr/local/bin /usr/local/bin
 
 # Copy application code

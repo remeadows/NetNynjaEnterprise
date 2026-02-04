@@ -3,16 +3,56 @@
 > Active issues and technical debt tracking
 
 **Version**: 0.2.13
-**Last Updated**: 2026-02-02 16:00 UTC
-**Stats**: 4 open | 1 deferred | 168 resolved (archived)
+**Last Updated**: 2026-02-04 17:00 UTC
+**Stats**: 5 open | 1 deferred | 173 resolved (archived)
 **Codex Review**: 2026-01-16 (E2E: FIXED, Security: Low, CI: PASS ✅)
-**Docker Scout**: 2026-01-15 (1 Critical, 3 High - 2 fixed via Vite 7 upgrade)
+**Docker Scout**: 2026-02-04 (Internet-facing: 0 CRITICAL ✅ | Internal: 12 CRITICAL - monitoring)
 **CI/CD Status**: ✅ ALL WORKFLOWS PASSING
-**npm audit**: 3 HIGH vulnerabilities (tar/argon2 - deferred to SEC-001)
+**Security Remediation**: SEC-012 Phase 1 Complete (Vault 1.18, Grafana 11.4.0, Fastify 5.x, Python 3.13)
 
 ---
 
 ## 🔥 NOW (Active / In Progress)
+
+### SEC-012: Security Vulnerability Remediation (Phase 1B Monitoring)
+
+**Status**: 🟡 Active - Monitoring for Upstream Patches
+**Priority**: 🔴 Critical - Security Issue
+**Detected**: 2026-02-04 (Trivy/Docker Scout scan)
+**Engineer**: DevOps
+
+**Phase 1 Complete** ✅:
+
+- Vault 1.15 → 1.18 (CVE-2024-41110 resolved)
+- Grafana 10.2.0 → 11.4.0
+- Fastify 4.x → 5.x (auth-service, gateway)
+- Python 3.11 → 3.13 (all services)
+- Internet-facing services: **0 CRITICAL vulnerabilities**
+
+**Phase 1B Monitoring** (waiting for upstream):
+
+- OpenSSL CVE-2025-15467 in Alpine images (postgres, redis, nats, grafana)
+- Root cause: Upstream Docker images haven't released patched versions
+- Mitigation: Internal services not internet-exposed, network segmentation
+
+**Risk Assessment**:
+
+- Internet-facing (auth, gateway): 🟢 LOW RISK (0 CRITICAL)
+- Internal infrastructure: 🟡 MEDIUM RISK (12 CRITICAL, mitigated)
+
+**Next Steps**:
+
+1. Set up daily monitoring for Alpine image updates
+2. Subscribe to Alpine/Grafana security mailing lists
+3. Deploy patches within 24h when available
+
+**Documentation**:
+
+- `docs/security/POST_REMEDIATION_REPORT.md`
+- `docs/security/PHASE_1B_ACTION_PLAN.md`
+- `docs/security/EXECUTIVE_SUMMARY.md`
+
+---
 
 ### NPM-001: SNMPv3 Credential Test Timeout
 
@@ -24,20 +64,24 @@
 **Issue**: SNMPv3 credential test times out when testing against Arista 720XP
 
 **Device Config**:
+
 - Target: 192.168.80.2 (Arista 720XP)
 - User: NPM-USER
 - Auth: SHA-256, Privacy: AES-256, Level: authPriv
 
 **Fixes Applied**:
+
 - Increased timeout from 5s to 10s in `apps/gateway/src/snmp.ts`
 - Increased retries from 1 to 2 for SNMPv3 engine ID discovery
 
 **Remaining Investigation**:
+
 1. Verify gateway container can reach 192.168.80.2 (Docker bridge network routing)
 2. Confirm SNMPv3 engine ID discovery is working
 3. Test with `snmpwalk` from Docker host to verify SNMP accessibility
 
 **Next Steps**:
+
 - Rebuild gateway container with updated timeout/retry values
 - Test connectivity: `docker exec netnynja-gateway ping 192.168.80.2`
 - If still failing, consider `network_mode: host` for gateway
@@ -54,6 +98,7 @@
 **Issue**: Syslog collector shows 0 events despite Arista switch being configured
 
 **Arista Config**:
+
 ```
 logging host 192.168.1.137
 logging host 192.168.250.10
@@ -63,11 +108,13 @@ logging source-interface Vlan80
 **Root Cause**: Network mismatch - Arista is sending to 192.168.1.137/192.168.250.10 but Docker host may be on different IP
 
 **Resolution Required**:
+
 1. Identify Docker host IP address on network reachable by Arista
 2. Update Arista logging config: `logging host <docker-host-ip>`
 3. OR ensure Docker host has IP 192.168.1.137 or 192.168.250.10
 
 **Verification**:
+
 - Port 514/udp is exposed in docker-compose.yml ✅
 - Syslog collector binds to 0.0.0.0:514 ✅
 - Parser supports Arista RFC 3164 format ✅
@@ -84,15 +131,18 @@ logging source-interface Vlan80
 **Issue**: Arista 720XP shows N/A for CPU, Memory, Disk, Swap metrics despite SNMP working
 
 **Root Cause**:
+
 - `snmpv3_poller.py` has hardcoded OID mappings that don't use `oid_mappings.py`
 - Arista doesn't support standard `hrProcessorLoad` OID (1.3.6.1.2.1.25.3.3.1.2.1)
 - Arista uses ENTITY-SENSOR-MIB for CPU/temp or requires walking all hrProcessorLoad indices
 
 **Files**:
+
 - `apps/npm/src/npm/collectors/snmpv3_poller.py` - needs to import from oid_mappings.py
 - `apps/npm/src/npm/collectors/oid_mappings.py` - OID definitions (already updated)
 
 **Fix Required**:
+
 1. Update `_get_cpu_metrics()` to walk `1.3.6.1.2.1.25.3.3.1.2` (all indices) for Arista
 2. Update `_get_memory_metrics()` to use hrStorageTable for Arista
 3. OR refactor poller to use `oid_mappings.py` vendor-specific OIDs
@@ -317,9 +367,43 @@ Count: 3 HIGH severity vulnerabilities
 
 ---
 
-## 📋 SEC-011: Docker Scout Vulnerability Remediation Plan
+## 📋 SEC-012: Critical Vulnerability Remediation (2026-02-04)
 
-**Status**: Active Monitoring | **Owner**: DevOps | **Created**: 2026-01-15
+**Status**: Phase 1 Complete, Phase 1B Monitoring | **Owner**: DevOps | **Created**: 2026-02-04
+
+### Post-Remediation Status (2026-02-04)
+
+| Service Category                 | CRITICAL | Status        | Notes                    |
+| -------------------------------- | -------- | ------------- | ------------------------ |
+| Internet-facing (auth, gateway)  | 0        | ✅ SECURE     | Fastify 5.x, Python 3.13 |
+| Internal (postgres, redis, nats) | 3        | 🟡 Monitoring | OpenSSL CVE-2025-15467   |
+| Grafana                          | 4        | 🟡 Monitoring | Go stdlib, curl, OpenSSL |
+| Redis                            | 5        | 🟡 Monitoring | gosu Go 1.18, OpenSSL    |
+
+### Remediation Applied (Phase 1)
+
+| Component | Before | After  | CVEs Resolved                    |
+| --------- | ------ | ------ | -------------------------------- |
+| Vault     | 1.15   | 1.18   | CVE-2024-41110 (auth bypass)     |
+| Grafana   | 10.2.0 | 11.4.0 | Previous CVEs (new ones pending) |
+| Fastify   | 4.25.x | 5.2.x  | Multiple plugin vulns            |
+| Python    | 3.11   | 3.13   | OpenSSL, SQLite CVEs             |
+
+### Remaining (Phase 1B - Upstream Dependency)
+
+| CVE            | Package   | Affected                       | Fix Available       |
+| -------------- | --------- | ------------------------------ | ------------------- |
+| CVE-2025-15467 | OpenSSL   | postgres, redis, nats, grafana | ⏳ Waiting Alpine   |
+| CVE-2025-22871 | Go stdlib | grafana, redis                 | ⏳ Waiting upstream |
+| CVE-2025-0665  | curl      | grafana                        | ⏳ Waiting upstream |
+
+**Action**: Daily monitoring for upstream patches. Deploy within 24h when available.
+
+---
+
+## 📋 SEC-011: Docker Scout Vulnerability Remediation Plan (Superseded by SEC-012)
+
+**Status**: ⚠️ Superseded by SEC-012 | **Owner**: DevOps | **Created**: 2026-01-15
 
 ### Current Vulnerabilities (Docker Scout Assessment)
 
@@ -403,62 +487,69 @@ All issues from Codex Review 2026-01-14 have been resolved.
 
 ## 📜 Recently Resolved (Last 30 Days)
 
-| ID       | P   | Title                                   | Resolved   | Resolution                                                  |
-| -------- | --- | --------------------------------------- | ---------- | ----------------------------------------------------------- |
-| APP-019  | 🔴  | Auth refresh returns 200 instead of 401 | 2026-02-02 | Changed to reply.status(401).send() pattern in auth-service |
-| APP-018  | 🔴  | Syslog events API 500 error             | 2026-02-02 | Fixed SQL parameter indexing, added try-catch error handler |
-| STIG-020 | 🟠  | Mellanox AAA parsing missing            | 2026-02-02 | Added AAA/TACACS/RADIUS parsing to MellanoxParser           |
-| CI-003   | 🔴  | TypeScript compilation errors           | 2026-01-18 | Fixed 5 TS errors in gateway STIG routes (79bcf10)          |
-| CI-002  | 🔴  | Missing source files (gitignore)        | 2026-01-18 | Root-anchored STIG/ pattern, added 3 files (97bc2e1)        |
-| CI-001  | 🔴  | CI/CD pipeline failures (Rollup ARM64)  | 2026-01-18 | Clean reinstall, audit trail, all workflows pass (8461bbb)  |
-| STIG-19 | 🟠  | Combined PDF for multi-STIG analysis    | 2026-01-18 | New combined-pdf/ckl endpoints with executive summary       |
-| STIG-18 | 🟠  | Config analysis only first STIG         | 2026-01-18 | Loop through all enabled STIGs, aggregate results           |
-| STIG-16 | 🟠  | CKL report missing V-ID details         | 2026-01-18 | Enhanced CKL exporter with rule details from database       |
-| STIG-15 | 🟠  | PDF report missing V-ID details         | 2026-01-18 | Added full description and fix text to PDF findings         |
-| STIG-14 | 🟠  | Config analysis requires STIG selection | 2026-01-18 | Auto-use assigned STIGs for config analysis                 |
-| STIG-13 | 🔴  | Multi-STIG selection for assets         | 2026-01-17 | Target-STIG associations, batch audits, combined PDF/CKL    |
-| STIG-12 | 🔴  | Report PDF/CKL download fails           | 2026-01-17 | Fixed config import, Pydantic model access, enhanced report |
-| STIG-11 | 🟠  | Config analysis 401 Unauthorized        | 2026-01-16 | Fixed frontend to use api client with auth header           |
-| STIG-10 | 🟠  | Config analysis 404 gateway route       | 2026-01-16 | Added proxy route in gateway for STIG service               |
-| STIG-09 | 🟠  | SSH audit endpoint proxy missing        | 2026-01-16 | Added audit routes proxy to gateway (STIG service)          |
-| STIG-08 | 🟠  | STIG Library XCCDF indexer              | 2026-01-16 | Created library module: catalog, parser, indexer            |
-| STIG-07 | 🟠  | STIG Library API endpoints              | 2026-01-16 | Added 6 API endpoints for browsing/searching library        |
-| STIG-06 | 🟠  | Config file analysis feature            | 2026-01-16 | Added parsers for 6 platforms, API endpoint, UI modal       |
-| CI-017  | 🔴  | Turbo/ESLint compatibility              | 2026-01-16 | Created ESLint 9.x flat config (eslint.config.mjs)          |
-| APP-016 | 🔴  | Syslog forwarder crash (missing DB)     | 2026-01-16 | Created migration 009_add_syslog_forwarders.sql             |
-| APP-017 | 🟠  | E2E tests blocked by artifacts          | 2026-01-16 | Fixed CI workflow path, updated .gitignore                  |
-| CI-012  | 🟠  | Vite 5.x to 7.x upgrade                 | 2026-01-15 | Upgraded Vite 7.3.1, fixed cross-spawn/glob CVEs            |
-| CI-015  | 🟠  | Tests workflow failing                  | 2026-01-15 | Added --passWithNoTests to Jest config                      |
-| CI-016  | 🟡  | E2E cleanup step failing                | 2026-01-15 | Added fallback to docker compose down in CI                 |
-| SEC-010 | 🟠  | Container security vulnerability scan   | 2026-01-15 | Docker Scout scan completed, report generated               |
-| DOC-003 | 🟢  | Code signing implementation guide       | 2026-01-15 | Created CODE_SIGNING_GUIDE.md with Cosign/GPG docs          |
-| INFRA-8 | 🟠  | Container image signing and publishing  | 2026-01-15 | All 14 images signed with Cosign, pushed to GHCR            |
-| UI-016  | 🟢  | ISSO Executive Summary document         | 2026-01-15 | Created HTML/Word doc with project overview for ISSO        |
-| UI-015  | 🟡  | Subtitle text illegible on dark bg      | 2026-01-15 | Brighter colors + text-shadow for gray-400/500              |
-| UI-014  | 🟢  | Add condensed display density           | 2026-01-15 | Added "Condensed" option with 9-15px fonts                  |
-| UI-013  | 🟡  | Display density system                  | 2026-01-15 | CSS variables for 4 density levels + toggle + prefs         |
-| STIG-05 | 🟠  | SSH credentials need sudo support       | 2026-01-15 | Added sudo fields to SSH credentials (method/user/pw)       |
-| STIG-04 | 🟠  | SSH credentials management UI           | 2026-01-15 | Created CredentialsPage with CRUD for SSH creds             |
-| APP-015 | 🟠  | Settings Preferences nav link           | 2026-01-15 | Added Preferences to Settings sidebar navigation            |
-| SEC-008 | 🟡  | NATS auth/TLS disabled                  | 2026-01-14 | Created nats.prod.conf, cert gen script, updated docs       |
-| SEC-009 | 🟢  | trustProxy always true                  | 2026-01-14 | Made configurable via TRUST_PROXY env var                   |
-| SEC-006 | 🟠  | .env tracked with secrets               | 2026-01-14 | Already in .gitignore, .env.example exists                  |
-| SEC-007 | 🟠  | DB/Cache ports exposed                  | 2026-01-14 | Bound Postgres/Redis/NATS to 127.0.0.1                      |
-| APP-012 | 🔴  | Preflight CRLF errors on Windows        | 2026-01-14 | Converted to LF, added PowerShell wrapper                   |
-| APP-013 | 🔴  | Preflight Docker checks fail            | 2026-01-14 | Created preflight.ps1 for native Windows                    |
-| APP-014 | 🟠  | OpenAPI endpoint mismatch               | 2026-01-14 | Fixed endpoint to `/docs/json`                              |
-| CI-013  | 🟡  | Tests workflow - shared-types not found | 2026-01-14 | Simplified package.json exports                             |
-| CI-005  | 🟠  | Validate Workspaces fails all platforms | 2026-01-14 | Changed to npm run build (Turborepo)                        |
-| SEC-004 | 🟡  | STIG ZIP upload DoS limits              | 2026-01-14 | Already implemented (500 files, 100MB)                      |
-| SEC-005 | 🟢  | Observability ports exposed             | 2026-01-14 | Bound to localhost only                                     |
-| WIN-001 | 🟠  | Windows Hyper-V port conflicts          | 2026-01-14 | NATS→8322, Vault→8300                                       |
-| #113    | 🟠  | NPM disk/storage metrics                | 2026-01-12 | Added Sophos SFOS OIDs                                      |
-| #114    | 🟠  | NPM interface traffic summaries         | 2026-01-12 | Added IF-MIB 64-bit counters                                |
-| #115    | 🟡  | NPM Sophos service status               | 2026-01-12 | Added 20+ service status OIDs                               |
-| APP-008 | 🟠  | STIG Library 500 error                  | 2026-01-12 | Created missing database tables                             |
-| APP-009 | 🟠  | Auto-polling not working                | 2026-01-12 | Created npm.device_metrics table                            |
-| APP-010 | 🟠  | NPM Poll Now fails                      | 2026-01-12 | Created partitioned metrics tables                          |
-| APP-011 | 🟡  | Sidebar toggle not visible              | 2026-01-12 | Fixed Sidebar.tsx condition                                 |
+| ID         | P   | Title                                   | Resolved   | Resolution                                                  |
+| ---------- | --- | --------------------------------------- | ---------- | ----------------------------------------------------------- |
+| SEC-012a   | 🔴  | Vault auth bypass CVE-2024-41110        | 2026-02-04 | Upgraded Vault 1.15 → 1.18                                  |
+| SEC-012b   | 🔴  | Grafana info leak CVE-2024-8986         | 2026-02-04 | Upgraded Grafana 10.2.0 → 11.4.0                            |
+| SEC-012c   | 🟠  | Fastify v4 → v5 security upgrade        | 2026-02-04 | Updated gateway + auth-service to Fastify 5.2.0             |
+| SEC-012d   | 🟠  | Python 3.11 OpenSSL vulnerabilities     | 2026-02-04 | Updated all Python services to 3.13-slim-bookworm           |
+| SYSLOG-002 | 🟠  | Syslog source stats showing 0 events    | 2026-02-04 | Added UNIQUE constraint migration 013, backfill stats       |
+| STIG-021   | 🟠  | STIG audit 422 Unprocessable Entity     | 2026-02-04 | Fixed gateway body wrapper for FastAPI {"data": {...}}      |
+| STIG-022   | 🟠  | STIG assignment 500 error               | 2026-02-04 | Applied migration 010_add_target_definitions.sql            |
+| APP-019    | 🔴  | Auth refresh returns 200 instead of 401 | 2026-02-02 | Changed to reply.status(401).send() pattern in auth-service |
+| APP-018    | 🔴  | Syslog events API 500 error             | 2026-02-02 | Fixed SQL parameter indexing, added try-catch error handler |
+| STIG-020   | 🟠  | Mellanox AAA parsing missing            | 2026-02-02 | Added AAA/TACACS/RADIUS parsing to MellanoxParser           |
+| CI-003     | 🔴  | TypeScript compilation errors           | 2026-01-18 | Fixed 5 TS errors in gateway STIG routes (79bcf10)          |
+| CI-002     | 🔴  | Missing source files (gitignore)        | 2026-01-18 | Root-anchored STIG/ pattern, added 3 files (97bc2e1)        |
+| CI-001     | 🔴  | CI/CD pipeline failures (Rollup ARM64)  | 2026-01-18 | Clean reinstall, audit trail, all workflows pass (8461bbb)  |
+| STIG-19    | 🟠  | Combined PDF for multi-STIG analysis    | 2026-01-18 | New combined-pdf/ckl endpoints with executive summary       |
+| STIG-18    | 🟠  | Config analysis only first STIG         | 2026-01-18 | Loop through all enabled STIGs, aggregate results           |
+| STIG-16    | 🟠  | CKL report missing V-ID details         | 2026-01-18 | Enhanced CKL exporter with rule details from database       |
+| STIG-15    | 🟠  | PDF report missing V-ID details         | 2026-01-18 | Added full description and fix text to PDF findings         |
+| STIG-14    | 🟠  | Config analysis requires STIG selection | 2026-01-18 | Auto-use assigned STIGs for config analysis                 |
+| STIG-13    | 🔴  | Multi-STIG selection for assets         | 2026-01-17 | Target-STIG associations, batch audits, combined PDF/CKL    |
+| STIG-12    | 🔴  | Report PDF/CKL download fails           | 2026-01-17 | Fixed config import, Pydantic model access, enhanced report |
+| STIG-11    | 🟠  | Config analysis 401 Unauthorized        | 2026-01-16 | Fixed frontend to use api client with auth header           |
+| STIG-10    | 🟠  | Config analysis 404 gateway route       | 2026-01-16 | Added proxy route in gateway for STIG service               |
+| STIG-09    | 🟠  | SSH audit endpoint proxy missing        | 2026-01-16 | Added audit routes proxy to gateway (STIG service)          |
+| STIG-08    | 🟠  | STIG Library XCCDF indexer              | 2026-01-16 | Created library module: catalog, parser, indexer            |
+| STIG-07    | 🟠  | STIG Library API endpoints              | 2026-01-16 | Added 6 API endpoints for browsing/searching library        |
+| STIG-06    | 🟠  | Config file analysis feature            | 2026-01-16 | Added parsers for 6 platforms, API endpoint, UI modal       |
+| CI-017     | 🔴  | Turbo/ESLint compatibility              | 2026-01-16 | Created ESLint 9.x flat config (eslint.config.mjs)          |
+| APP-016    | 🔴  | Syslog forwarder crash (missing DB)     | 2026-01-16 | Created migration 009_add_syslog_forwarders.sql             |
+| APP-017    | 🟠  | E2E tests blocked by artifacts          | 2026-01-16 | Fixed CI workflow path, updated .gitignore                  |
+| CI-012     | 🟠  | Vite 5.x to 7.x upgrade                 | 2026-01-15 | Upgraded Vite 7.3.1, fixed cross-spawn/glob CVEs            |
+| CI-015     | 🟠  | Tests workflow failing                  | 2026-01-15 | Added --passWithNoTests to Jest config                      |
+| CI-016     | 🟡  | E2E cleanup step failing                | 2026-01-15 | Added fallback to docker compose down in CI                 |
+| SEC-010    | 🟠  | Container security vulnerability scan   | 2026-01-15 | Docker Scout scan completed, report generated               |
+| DOC-003    | 🟢  | Code signing implementation guide       | 2026-01-15 | Created CODE_SIGNING_GUIDE.md with Cosign/GPG docs          |
+| INFRA-8    | 🟠  | Container image signing and publishing  | 2026-01-15 | All 14 images signed with Cosign, pushed to GHCR            |
+| UI-016     | 🟢  | ISSO Executive Summary document         | 2026-01-15 | Created HTML/Word doc with project overview for ISSO        |
+| UI-015     | 🟡  | Subtitle text illegible on dark bg      | 2026-01-15 | Brighter colors + text-shadow for gray-400/500              |
+| UI-014     | 🟢  | Add condensed display density           | 2026-01-15 | Added "Condensed" option with 9-15px fonts                  |
+| UI-013     | 🟡  | Display density system                  | 2026-01-15 | CSS variables for 4 density levels + toggle + prefs         |
+| STIG-05    | 🟠  | SSH credentials need sudo support       | 2026-01-15 | Added sudo fields to SSH credentials (method/user/pw)       |
+| STIG-04    | 🟠  | SSH credentials management UI           | 2026-01-15 | Created CredentialsPage with CRUD for SSH creds             |
+| APP-015    | 🟠  | Settings Preferences nav link           | 2026-01-15 | Added Preferences to Settings sidebar navigation            |
+| SEC-008    | 🟡  | NATS auth/TLS disabled                  | 2026-01-14 | Created nats.prod.conf, cert gen script, updated docs       |
+| SEC-009    | 🟢  | trustProxy always true                  | 2026-01-14 | Made configurable via TRUST_PROXY env var                   |
+| SEC-006    | 🟠  | .env tracked with secrets               | 2026-01-14 | Already in .gitignore, .env.example exists                  |
+| SEC-007    | 🟠  | DB/Cache ports exposed                  | 2026-01-14 | Bound Postgres/Redis/NATS to 127.0.0.1                      |
+| APP-012    | 🔴  | Preflight CRLF errors on Windows        | 2026-01-14 | Converted to LF, added PowerShell wrapper                   |
+| APP-013    | 🔴  | Preflight Docker checks fail            | 2026-01-14 | Created preflight.ps1 for native Windows                    |
+| APP-014    | 🟠  | OpenAPI endpoint mismatch               | 2026-01-14 | Fixed endpoint to `/docs/json`                              |
+| CI-013     | 🟡  | Tests workflow - shared-types not found | 2026-01-14 | Simplified package.json exports                             |
+| CI-005     | 🟠  | Validate Workspaces fails all platforms | 2026-01-14 | Changed to npm run build (Turborepo)                        |
+| SEC-004    | 🟡  | STIG ZIP upload DoS limits              | 2026-01-14 | Already implemented (500 files, 100MB)                      |
+| SEC-005    | 🟢  | Observability ports exposed             | 2026-01-14 | Bound to localhost only                                     |
+| WIN-001    | 🟠  | Windows Hyper-V port conflicts          | 2026-01-14 | NATS→8322, Vault→8300                                       |
+| #113       | 🟠  | NPM disk/storage metrics                | 2026-01-12 | Added Sophos SFOS OIDs                                      |
+| #114       | 🟠  | NPM interface traffic summaries         | 2026-01-12 | Added IF-MIB 64-bit counters                                |
+| #115       | 🟡  | NPM Sophos service status               | 2026-01-12 | Added 20+ service status OIDs                               |
+| APP-008    | 🟠  | STIG Library 500 error                  | 2026-01-12 | Created missing database tables                             |
+| APP-009    | 🟠  | Auto-polling not working                | 2026-01-12 | Created npm.device_metrics table                            |
+| APP-010    | 🟠  | NPM Poll Now fails                      | 2026-01-12 | Created partitioned metrics tables                          |
+| APP-011    | 🟡  | Sidebar toggle not visible              | 2026-01-12 | Fixed Sidebar.tsx condition                                 |
 
 ---
 

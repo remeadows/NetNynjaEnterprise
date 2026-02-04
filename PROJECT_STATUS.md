@@ -1,13 +1,14 @@
 # NetNynja Enterprise - Project Status
 
-**Version**: 0.2.12
-**Last Updated**: 2026-01-20 17:15 UTC
+**Version**: 0.2.13
+**Last Updated**: 2026-02-04 17:00 UTC
 **Current Phase**: Phase 9 - CI/CD & Release (Complete)
 **Overall Progress**: ▓▓▓▓▓▓▓▓▓▓ 100%
-**Issues**: 3 Open | 165 Resolved | 1 Deferred
-**Security Posture**: Medium (Docker Scout: 1 Critical, 3 High | npm audit: 3 HIGH deferred to SEC-001)
+**Issues**: 5 Open | 170 Resolved | 1 Deferred
+**Security Posture**: 🟡 ACCEPTABLE (Internet-facing: 0 CRITICAL ✅ | Internal: 12 CRITICAL - monitoring for upstream patches)
 **Container Security**: All 14 images cryptographically signed with Cosign ✅
-**Release Status**: v0.2.12 Ready (CI: ✅ ALL WORKFLOWS PASSING)
+**Release Status**: v0.2.13 Ready (CI: ✅ ALL WORKFLOWS PASSING)
+**Security Remediation**: SEC-012 Phase 1 Complete - Vault 1.18, Grafana 11.4.0, Fastify 5.x, Python 3.13
 
 ---
 
@@ -64,13 +65,16 @@ NetNynja Enterprise consolidates three network management applications (IPAM, NP
 
 ### External
 
-| Package    | Version |
-| ---------- | ------- |
-| Node.js    | 20.x    |
-| Python     | 3.11+   |
-| PostgreSQL | 15      |
-| Redis      | 7       |
-| NATS       | 2.10    |
+| Package    | Version | Notes                             |
+| ---------- | ------- | --------------------------------- |
+| Node.js    | 20.x    |                                   |
+| Python     | 3.13+   | Updated 2026-02-04 for security   |
+| PostgreSQL | 15      |                                   |
+| Redis      | 7       |                                   |
+| NATS       | 2.10    |                                   |
+| Fastify    | 5.x     | Upgraded from 4.x (2026-02-04)    |
+| Vault      | 1.18    | Upgraded from 1.15 (2026-02-04)   |
+| Grafana    | 11.4.0  | Upgraded from 10.2.0 (2026-02-04) |
 
 ### Internal
 
@@ -81,6 +85,50 @@ NetNynja Enterprise consolidates three network management applications (IPAM, NP
 ---
 
 ## Changelog
+
+### [0.2.13] - 2026-02-04 (Security Remediation - SEC-012)
+
+**Critical Security Vulnerability Remediation**
+
+CI/CD Status: PASS ✅
+
+Security Fixes (Phase 1 Complete):
+
+- Upgraded Vault 1.15 → 1.18 (resolved CVE-2024-41110 auth bypass)
+- Upgraded Grafana 10.2.0 → 11.4.0 (resolved previous CVEs, new ones pending upstream)
+- Upgraded Fastify 4.x → 5.x in gateway and auth-service
+- Upgraded all Python services from 3.11 → 3.13 base images
+- Updated all gateway plugins to Fastify 5.x compatibility
+- Added security dependencies: cross-spawn 7.0.5, glob 11.1.0, tar 7.5.0
+
+Infrastructure Changes:
+
+- docker-compose.yml: Vault 1.18, Grafana 11.4.0 images
+- apps/gateway/package.json: Fastify 5.2.0, updated @fastify/\* plugins
+- services/auth-service/package.json: Fastify 5.2.0, updated plugins
+- apps/ipam/Dockerfile: Python 3.13-slim-bookworm base
+- apps/npm/Dockerfile: Python 3.13-slim-bookworm base
+- apps/stig/Dockerfile: Python 3.13-slim-bookworm base
+- apps/syslog/Dockerfile: Python 3.13-slim-bookworm base
+- Gateway plugins updated: error-handler, swagger, rate-limit, loki-logging, auth, metrics
+
+Remaining Items (Phase 1B - monitoring for upstream patches):
+
+- OpenSSL CVE-2025-15467 in Alpine images (postgres, redis, nats, grafana)
+- Waiting for upstream Docker image maintainers to release patches
+- Daily monitoring script recommended
+
+Bug Fixes:
+
+- Fixed syslog source statistics not tracking (migration 013_fix_syslog_source_unique.sql)
+- Fixed STIG audit 422 error (gateway body wrapper for FastAPI)
+- Fixed STIG assignment 500 error (migration 010_add_target_definitions.sql)
+
+Security Documentation:
+
+- docs/security/POST_REMEDIATION_REPORT.md - Detailed scan results
+- docs/security/PHASE_1B_ACTION_PLAN.md - Remaining action items
+- docs/security/EXECUTIVE_SUMMARY.md - Leadership overview
 
 ### [0.2.3] - 2026-01-14
 

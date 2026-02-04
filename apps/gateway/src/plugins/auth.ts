@@ -109,7 +109,7 @@ const authPlugin: FastifyPluginAsync<AuthPluginOptions> = async (
 
 export default fp(authPlugin, {
   name: "auth",
-  fastify: "4.x",
+  fastify: "5.x",
 });
 
 // ============================================

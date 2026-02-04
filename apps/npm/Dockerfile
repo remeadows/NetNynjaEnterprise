@@ -2,9 +2,12 @@
 # Build: docker build --target production -t netnynja-npm .
 
 # ==================================================
-# Base image with Python 3.11
+# Base image with Python 3.13 (security update)
 # ==================================================
-FROM python:3.11-slim-bookworm AS base
+FROM python:3.13-slim-bookworm AS base
+
+# Security: Update system packages
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -92,7 +95,7 @@ RUN pip wheel --no-deps --wheel-dir /app/wheels .
 # ==================================================
 # Production stage
 # ==================================================
-FROM python:3.11-slim-bookworm AS production
+FROM python:3.13-slim-bookworm AS production
 
 # Non-root user for security
 RUN groupadd --gid 1000 npm && \

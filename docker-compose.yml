@@ -91,7 +91,7 @@ services:
       - netnynja-network
 
   vault:
-    image: hashicorp/vault:1.15
+    image: hashicorp/vault:1.18
     profiles: ["infra", "ipam", "npm", "stig"]
     container_name: netnynja-vault
     restart: unless-stopped
@@ -212,7 +212,7 @@ services:
       - netnynja-network
 
   grafana:
-    image: grafana/grafana:10.2.0
+    image: grafana/grafana:11.4.0
     profiles: ["infra", "ipam", "npm", "stig"]
     container_name: netnynja-grafana
     restart: unless-stopped
@@ -695,6 +695,11 @@ services:
     profiles: ["syslog"]
     container_name: netnynja-syslog-collector
     restart: unless-stopped
+    # NOTE: On Windows/WSL2, network_mode:host doesn't work as expected.
+    # Docker NAT will translate source IPs to bridge gateway (172.30.0.1).
+    # Configure syslog sources to match the NAT'd IP, or use hostname from syslog message.
+    # For Linux hosts, uncomment network_mode: host below for real source IPs.
+    # network_mode: host
     environment:
       POSTGRES_URL: postgresql://${POSTGRES_USER:-netnynja}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-netnynja}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379

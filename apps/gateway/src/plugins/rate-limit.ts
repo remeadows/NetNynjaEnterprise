@@ -116,6 +116,6 @@ const rateLimitPlugin: FastifyPluginAsync = async (fastify) => {
 
 export default fp(rateLimitPlugin, {
   name: "rate-limit",
-  fastify: "4.x",
+  fastify: "5.x",
   dependencies: ["auth"], // Ensure auth plugin is loaded first for user info
 });

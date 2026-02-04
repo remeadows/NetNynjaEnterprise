@@ -391,5 +391,5 @@ const metricsPlugin: FastifyPluginAsync = async (fastify) => {
 
 export default fp(metricsPlugin, {
   name: "netnynja-metrics",
-  fastify: "4.x",
+  fastify: "5.x",
 });

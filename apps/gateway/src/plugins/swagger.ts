@@ -677,5 +677,5 @@ API version is included in the URL path: \`/api/v1/...\`
 
 export default fp(swaggerPlugin, {
   name: "swagger",
-  fastify: "4.x",
+  fastify: "5.x",
 });
