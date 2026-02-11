@@ -95,6 +95,9 @@ services:
     profiles: ["infra", "ipam", "npm", "stig"]
     container_name: netnynja-vault
     restart: unless-stopped
+    # SEC-021: Minimum capabilities — IPC_LOCK required for mlock (secret protection)
+    cap_drop:
+      - ALL
     cap_add:
       - IPC_LOCK
     environment:
@@ -251,6 +254,9 @@ services:
     profiles: ["ipam", "npm", "stig"]
     container_name: netnynja-gateway
     restart: unless-stopped
+    # SEC-021: No elevated capabilities needed
+    cap_drop:
+      - ALL
     # NMAP Fingerprinting Note: To enable MAC address detection for hosts on your
     # physical LAN, uncomment 'network_mode: host' below and comment out the
     # 'networks' and 'ports' sections. Host network mode gives the container direct
@@ -303,6 +309,8 @@ services:
     profiles: ["ipam", "npm", "stig"]
     container_name: netnynja-auth-service
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       NODE_ENV: development
       PORT: 3006
@@ -371,6 +379,8 @@ services:
     profiles: ["ipam"]
     container_name: netnynja-ipam-service
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       NODE_ENV: development
       IPAM_HOST: "0.0.0.0"
@@ -432,9 +442,11 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
+    # SEC-021: Minimum capabilities — NET_RAW for ICMP ping/nmap (NET_ADMIN removed)
+    cap_drop:
+      - ALL
     cap_add:
       - NET_RAW
-      - NET_ADMIN
     logging: *default-logging
     networks:
       - netnynja-network
@@ -451,6 +463,8 @@ services:
     profiles: ["npm"]
     container_name: netnynja-npm-service
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       NODE_ENV: development
       NPM_HOST: "0.0.0.0"
@@ -496,6 +510,8 @@ services:
     profiles: ["npm"]
     container_name: netnynja-npm-collector
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       POSTGRES_URL: postgresql://${POSTGRES_USER:-netnynja}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-netnynja}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
@@ -524,6 +540,8 @@ services:
     profiles: ["npm"]
     container_name: netnynja-npm-alerts
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       POSTGRES_URL: postgresql://${POSTGRES_USER:-netnynja}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-netnynja}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
@@ -553,6 +571,8 @@ services:
     profiles: ["stig"]
     container_name: netnynja-stig-service
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       NODE_ENV: development
       STIG_HOST: "0.0.0.0"
@@ -600,6 +620,8 @@ services:
     profiles: ["stig"]
     container_name: netnynja-stig-collector
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       POSTGRES_URL: postgresql://${POSTGRES_USER:-netnynja}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-netnynja}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
@@ -625,6 +647,8 @@ services:
     profiles: ["stig"]
     container_name: netnynja-stig-reports
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       POSTGRES_URL: postgresql://${POSTGRES_USER:-netnynja}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-netnynja}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
@@ -655,6 +679,8 @@ services:
     profiles: ["syslog"]
     container_name: netnynja-syslog-service
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       NODE_ENV: development
       SYSLOG_HOST: "0.0.0.0"
@@ -716,8 +742,11 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
+    # SEC-021: Minimum capabilities — NET_BIND_SERVICE for port 514
+    cap_drop:
+      - ALL
     cap_add:
-      - NET_BIND_SERVICE # Allow binding to port 514
+      - NET_BIND_SERVICE
     logging: *default-logging
     networks:
       - netnynja-network
@@ -730,6 +759,8 @@ services:
     profiles: ["syslog"]
     container_name: netnynja-syslog-forwarder
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       POSTGRES_URL: postgresql://${POSTGRES_USER:-netnynja}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-netnynja}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379

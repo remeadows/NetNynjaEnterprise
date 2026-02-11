@@ -1,8 +1,16 @@
-"""XCCDF Parser for extracting STIG metadata from DISA STIG XML files."""
+"""XCCDF Parser for extracting STIG metadata from DISA STIG XML files.
+
+Security (SEC-016):
+- Uses defusedxml.ElementTree for all XML parsing to prevent XXE,
+  entity expansion, and external entity attacks.
+- Enforces size limits on XML content and ZIP archives.
+- stdlib xml.etree.ElementTree is used ONLY for Element/SubElement
+  construction (which does not parse untrusted input).
+"""
 
 import logging
 import re
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # Used ONLY for type hints and element construction
 import zipfile
 from dataclasses import dataclass, field
 from datetime import date
@@ -10,8 +18,11 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, BinaryIO
 
+from defusedxml import ElementTree as SafeET
+
 from .catalog import PLATFORM_MAPPINGS, STIGEntry, STIGType
 from ..models.target import Platform
+from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +77,9 @@ class XCCDFParser:
     def parse_zip(self, zip_path: Path | str) -> tuple[STIGEntry | None, list[XCCDFRule]]:
         """Parse a STIG ZIP file and extract metadata and rules.
 
+        Security: Enforces entry count and individual file size limits
+        to prevent zip bomb and resource exhaustion attacks.
+
         Args:
             zip_path: Path to STIG ZIP file
 
@@ -77,10 +91,32 @@ class XCCDFParser:
 
         try:
             with zipfile.ZipFile(zip_path, "r") as zf:
+                # --- SEC-016: ZIP entry count limit ---
+                if len(zf.namelist()) > settings.max_zip_entries:
+                    logger.error(
+                        "zip_entry_count_exceeded",
+                        file=zip_path.name,
+                        entries=len(zf.namelist()),
+                        limit=settings.max_zip_entries,
+                    )
+                    return None, []
+
                 # Find XCCDF XML file within ZIP
                 xccdf_file = self._find_xccdf_file(zf)
                 if not xccdf_file:
                     logger.warning(f"No XCCDF file found in {zip_path.name}")
+                    return None, []
+
+                # --- SEC-016: ZIP entry size limit ---
+                info = zf.getinfo(xccdf_file)
+                if info.file_size > settings.max_zip_entry_size:
+                    logger.error(
+                        "zip_entry_size_exceeded",
+                        file=zip_path.name,
+                        entry=xccdf_file,
+                        size=info.file_size,
+                        limit=settings.max_zip_entry_size,
+                    )
                     return None, []
 
                 # Read and parse XML
@@ -114,6 +150,17 @@ class XCCDFParser:
         self._current_file = xml_path.name
 
         try:
+            # --- SEC-016: Check file size before reading ---
+            file_size = xml_path.stat().st_size
+            if file_size > settings.max_xml_size:
+                logger.error(
+                    "xml_file_size_exceeded",
+                    file=xml_path.name,
+                    size=file_size,
+                    limit=settings.max_xml_size,
+                )
+                return None, []
+
             with open(xml_path, "rb") as f:
                 return self._parse_xccdf_content(f.read())
         except Exception as e:
@@ -157,14 +204,28 @@ class XCCDFParser:
     ) -> tuple[STIGEntry | None, list[XCCDFRule]]:
         """Parse XCCDF XML content.
 
+        Security (SEC-016): Uses defusedxml to prevent XXE and entity
+        expansion attacks. Enforces a size limit on raw XML content.
+
         Args:
             content: XML content as bytes
 
         Returns:
             Tuple of (STIGEntry metadata, list of rules)
         """
+        # --- SEC-016: XML size limit ---
+        if len(content) > settings.max_xml_size:
+            logger.error(
+                "xml_size_exceeded",
+                file=self._current_file,
+                size=len(content),
+                limit=settings.max_xml_size,
+            )
+            return None, []
+
         try:
-            root = ET.fromstring(content)
+            # SEC-016: defusedxml prevents XXE, entity expansion, DTD processing
+            root = SafeET.fromstring(content)
         except ET.ParseError as e:
             logger.error(f"XML parse error in {self._current_file}: {e}")
             return None, []

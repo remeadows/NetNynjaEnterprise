@@ -1,14 +1,15 @@
 # NetNynja Enterprise - Project Status
 
 **Version**: 0.2.13
-**Last Updated**: 2026-02-04 17:00 UTC
-**Current Phase**: Phase 9 - CI/CD & Release (Complete)
-**Overall Progress**: ▓▓▓▓▓▓▓▓▓▓ 100%
-**Issues**: 5 Open | 170 Resolved | 1 Deferred
-**Security Posture**: 🟡 ACCEPTABLE (Internet-facing: 0 CRITICAL ✅ | Internal: 12 CRITICAL - monitoring for upstream patches)
-**Container Security**: All 14 images cryptographically signed with Cosign ✅
-**Release Status**: v0.2.13 Ready (CI: ✅ ALL WORKFLOWS PASSING)
-**Security Remediation**: SEC-012 Phase 1 Complete - Vault 1.18, Grafana 11.4.0, Fastify 5.x, Python 3.13
+**Last Updated**: 2026-02-11 23:45 UTC
+**Current Phase**: Phase 9 - CI/CD & Release (Complete) | Security Hardening Sprint Day 5 of 5
+**Overall Progress**: ▓▓▓▓▓▓▓▓▓▓ 100% (Features) | ▓▓▓▓▓▓▓▓▓░ 97% (Production Readiness)
+**Issues**: 3 Open | 186 Resolved | 0 Deferred
+**Security Posture**: 🟢 ALL LAUNCH BLOCKERS + ALL TIER 1 RESOLVED
+**Container Security**: All 14 images cryptographically signed with Cosign ✅ | cap_drop: ALL on all services ✅
+**Release Status**: v0.2.13 Lab/Dev Ready | Production: Day 5 validation pass remaining
+**Security Remediation**: SEC-012 Phase 1 Complete | SEC-HARDENING-01 Sprint Day 5: 5/5 blockers + 6/6 Tier 1 + APP-020 resolved
+**Dual Security Review**: Codex (20260211-1133) + Gemini (20260211-1146) — ALL findings addressed, Day 5 validation pending
 
 ---
 
@@ -46,6 +47,42 @@ NetNynja Enterprise consolidates three network management applications (IPAM, NP
 | Windows 11     | ✅ 10/10 containers healthy |
 | macOS (x64)    | ⬜ Deferred                 |
 | Windows Server | ⬜ Script ready             |
+
+---
+
+## Security Hardening Sprint (SEC-HARDENING-01)
+
+**Triggered By**: Dual independent security review (Codex + Gemini, 2026-02-11)
+**Sprint Duration**: 2026-02-12 → 2026-02-18 (5 business days)
+**Detail**: See [SPRINT_SEC_HARDENING.md](SPRINT_SEC_HARDENING.md)
+
+### Launch Blockers (Tier 0)
+
+| ID      | Issue                                                   | Day | Agent |
+| ------- | ------------------------------------------------------- | --- | ----- |
+| SEC-013 | SSH auditor fallback credentials + host key bypass      | 1   | Codex |
+| SEC-014 | Production secret elimination + docker-compose.prod.yml | 1   | Codex |
+| SEC-015 | Syslog collector: rate limits, size caps, IP allowlist  | 2   | Codex |
+| SEC-016 | XML parsing: replace ElementTree with defusedxml        | 2   | Codex |
+| SEC-017 | STIG config upload size limits                          | 3   | Codex |
+
+### High Priority (Tier 1)
+
+| ID      | Issue                                                 | Day | Agent          |
+| ------- | ----------------------------------------------------- | --- | -------------- |
+| SEC-001 | tar RCE remediation (escalated from deferred)         | 3   | Codex          |
+| SEC-018 | SSH credential encryption: per-record salt + rotation | 3   | Codex          |
+| SEC-019 | Comprehensive input sanitization audit                | 4   | Codex + Claude |
+| SEC-020 | Syslog API: structured logging + CORS restriction     | 4   | Codex          |
+| SEC-021 | Container capability refinement                       | 4   | Codex          |
+| SEC-022 | Syslog forwarding TLS enforcement                     | 4   | Codex          |
+| SEC-023 | Raw payload redaction + size limits                   | 4   | Codex          |
+
+### Sprint Gate
+
+- Day 5: Gemini post-remediation validation pass
+- Day 5: Documentation updates (Claude)
+- Day 5: ~~APP-020 (route mismatch)~~ ✅ Resolved + APP-021 (syslog stats endpoint)
 
 ---
 

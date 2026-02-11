@@ -1,13 +1,20 @@
-"""CKL (Checklist) export functionality for STIG audit results."""
+"""CKL (Checklist) export functionality for STIG audit results.
+
+Security (SEC-016):
+- CKL import/parsing uses defusedxml (SafeET) to prevent XXE attacks.
+- CKL export/creation uses stdlib ET (safe — no untrusted input parsed).
+- File size limits enforced on CKL imports.
+"""
 
 import re
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # Safe for element construction only
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from defusedxml import ElementTree as SafeET
 
+from ..core.config import settings
 from ..core.logging import get_logger
 from ..models import (
     AuditJob,
@@ -256,12 +263,31 @@ class CKLExporter:
     def parse(self, ckl_path: Path) -> CKLData:
         """Parse an existing CKL file.
 
+        Security (SEC-016): Enforces file size limit before parsing.
+
         Args:
             ckl_path: Path to CKL file
 
         Returns:
             Parsed CKL data
+
+        Raises:
+            ValueError: If CKL file exceeds size limit
         """
+        # --- SEC-016: File size limit ---
+        file_size = ckl_path.stat().st_size
+        if file_size > settings.max_xml_size:
+            logger.error(
+                "ckl_file_size_exceeded",
+                file=ckl_path.name,
+                size=file_size,
+                limit=settings.max_xml_size,
+            )
+            raise ValueError(
+                f"CKL file {ckl_path.name} exceeds size limit "
+                f"({file_size} bytes > {settings.max_xml_size} bytes)"
+            )
+
         tree = SafeET.parse(str(ckl_path))
         root = tree.getroot()
 

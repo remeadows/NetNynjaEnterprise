@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFil
 from fastapi.responses import FileResponse
 
 from ..core.auth import get_current_user, require_role, UserContext
+from ..core.config import settings
 from ..core.logging import get_logger
 from ..db.repository import (
     TargetRepository,
@@ -1324,9 +1325,28 @@ async def analyze_target_config(
             detail=f"Definition not found: {definition_id}",
         )
 
-    # Read configuration file
+    # --- SEC-017: Validate file before reading ---
+    filename = config_file.filename or ""
+    valid_extensions = [
+        ext.strip() for ext in settings.allowed_config_extensions.split(",") if ext.strip()
+    ]
+    if not any(filename.lower().endswith(ext) for ext in valid_extensions):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type. Supported: {', '.join(valid_extensions)}",
+        )
+
+    # SEC-017: Read with size limit — prevents memory exhaustion
+    content = await config_file.read()
+    if len(content) > settings.max_config_upload_size:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Configuration file exceeds maximum size "
+                   f"({len(content)} bytes > {settings.max_config_upload_size} bytes). "
+                   f"Max: {settings.max_config_upload_size // (1024 * 1024)}MB.",
+        )
+
     try:
-        content = await config_file.read()
         config_content = content.decode("utf-8")
     except UnicodeDecodeError:
         raise HTTPException(
@@ -1337,15 +1357,6 @@ async def analyze_target_config(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to read configuration file: {str(e)}",
-        )
-
-    # Validate file extension
-    filename = config_file.filename or ""
-    valid_extensions = [".txt", ".xml", ".conf", ".cfg"]
-    if not any(filename.lower().endswith(ext) for ext in valid_extensions):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type. Supported: {', '.join(valid_extensions)}",
         )
 
     # Create audit job
@@ -1438,9 +1449,28 @@ async def analyze_config_standalone(
     Returns:
         Compliance analysis results
     """
-    # Read configuration file
+    # --- SEC-017: Validate file extension ---
+    filename = config_file.filename or ""
+    valid_extensions = [
+        ext.strip() for ext in settings.allowed_config_extensions.split(",") if ext.strip()
+    ]
+    if not any(filename.lower().endswith(ext) for ext in valid_extensions):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type. Supported: {', '.join(valid_extensions)}",
+        )
+
+    # SEC-017: Read with size limit
+    content = await config_file.read()
+    if len(content) > settings.max_config_upload_size:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Configuration file exceeds maximum size "
+                   f"({len(content)} bytes > {settings.max_config_upload_size} bytes). "
+                   f"Max: {settings.max_config_upload_size // (1024 * 1024)}MB.",
+        )
+
     try:
-        content = await config_file.read()
         config_content = content.decode("utf-8")
     except UnicodeDecodeError:
         raise HTTPException(

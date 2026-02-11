@@ -8,15 +8,22 @@ Supported formats:
 - Mellanox (.txt)
 - pfSense (.xml)
 - Red Hat Linux (various config files)
+
+Security (SEC-016):
+- pfSense XML configs are parsed with defusedxml to prevent XXE attacks.
+- XML size limits enforced via STIG_MAX_XML_SIZE setting.
 """
 
 import re
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # Used for type hints only
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from defusedxml import ElementTree as SafeET
+
+from ..core.config import settings
 from ..core.logging import get_logger
 from ..models import (
     Platform,
@@ -450,11 +457,24 @@ class PfSenseParser(ConfigParser):
         return Platform.PFSENSE
 
     def parse(self, content: str) -> ParsedConfig:
-        """Parse pfSense XML configuration."""
+        """Parse pfSense XML configuration.
+
+        Security (SEC-016): Uses defusedxml and enforces XML size limit.
+        """
         config = ParsedConfig(platform=self.platform, raw_content=content)
 
+        # --- SEC-016: XML size limit ---
+        if len(content.encode("utf-8", errors="replace")) > settings.max_xml_size:
+            logger.error(
+                "pfsense_xml_size_exceeded",
+                size=len(content),
+                limit=settings.max_xml_size,
+            )
+            return config
+
         try:
-            root = ET.fromstring(content)
+            # SEC-016: defusedxml prevents XXE and entity expansion
+            root = SafeET.fromstring(content)
         except ET.ParseError as e:
             logger.error("pfsense_xml_parse_error", error=str(e))
             return config

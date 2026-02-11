@@ -2,12 +2,23 @@
 Syslog UDP/TCP collector service.
 
 Listens on UDP/TCP port 514 (configurable) and processes incoming syslog messages.
+
+Security controls (SEC-015):
+- Message size cap (SYSLOG_MAX_MESSAGE_SIZE)
+- Global and per-source rate limiting
+- Optional IP allowlist (SYSLOG_ALLOWED_SOURCES)
+- Backpressure when in-memory buffer exceeds threshold
+- Structured metrics for all drop events
 """
 
 import asyncio
+import ipaddress
 import json
+import re
 import signal
 import sys
+import time
+from collections import defaultdict
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
@@ -43,9 +54,158 @@ class SyslogCollector:
         self.event_buffer: list[dict[str, Any]] = []
         self.buffer_lock = asyncio.Lock()
 
+        # --- SEC-015: Security controls ---
+
+        # IP allowlist (parsed from comma-separated CIDRs/IPs)
+        self._allowed_networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+        self._ip_allowlist_enabled = False
+        self._parse_allowed_sources()
+
+        # Rate limiting state (sliding window, resets every second)
+        self._global_msg_count = 0
+        self._global_window_start = time.monotonic()
+        self._per_source_counts: dict[str, int] = defaultdict(int)
+        self._per_source_window_start: dict[str, float] = defaultdict(time.monotonic)
+
+        # Drop metrics (reset periodically by metrics reporter)
+        self._drops_oversized = 0
+        self._drops_rate_limited = 0
+        self._drops_ip_denied = 0
+        self._drops_backpressure = 0
+        self._total_accepted = 0
+
+        # --- SEC-023: Payload redaction patterns ---
+        self._redaction_patterns: list[re.Pattern[str]] = []
+        self._parse_redaction_patterns()
+
+    def _parse_allowed_sources(self) -> None:
+        """Parse SYSLOG_ALLOWED_SOURCES into a list of IP networks."""
+        raw = settings.SYSLOG_ALLOWED_SOURCES.strip()
+        if not raw:
+            self._ip_allowlist_enabled = False
+            return
+
+        self._ip_allowlist_enabled = True
+        for entry in raw.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            try:
+                # Handles both "10.0.0.1" and "10.0.0.0/8"
+                network = ipaddress.ip_network(entry, strict=False)
+                self._allowed_networks.append(network)
+            except ValueError:
+                logger.warning(
+                    "invalid_allowed_source_entry",
+                    entry=entry,
+                    reason="Could not parse as IP address or CIDR range — skipping.",
+                )
+
+        if not self._allowed_networks:
+            logger.warning(
+                "allowed_sources_configured_but_empty",
+                reason="SYSLOG_ALLOWED_SOURCES was set but contained no valid entries. "
+                       "All traffic will be DENIED.",
+            )
+
+    def _is_source_allowed(self, source_ip: str) -> bool:
+        """Check if a source IP is in the allowlist.
+
+        Returns True if allowlist is disabled (empty config) or IP matches.
+        """
+        if not self._ip_allowlist_enabled:
+            return True
+
+        try:
+            addr = ipaddress.ip_address(source_ip)
+        except ValueError:
+            return False
+
+        return any(addr in network for network in self._allowed_networks)
+
+    def _check_rate_limit(self, source_ip: str) -> bool:
+        """Check global and per-source rate limits.
+
+        Returns True if the message should be accepted.
+        Uses a simple sliding-window counter that resets each second.
+        """
+        now = time.monotonic()
+
+        # --- Global rate limit ---
+        if settings.SYSLOG_MAX_MESSAGES_PER_SECOND > 0:
+            if now - self._global_window_start >= 1.0:
+                self._global_msg_count = 0
+                self._global_window_start = now
+
+            if self._global_msg_count >= settings.SYSLOG_MAX_MESSAGES_PER_SECOND:
+                return False
+            self._global_msg_count += 1
+
+        # --- Per-source rate limit ---
+        if settings.SYSLOG_MAX_PER_SOURCE_PER_SECOND > 0:
+            window_start = self._per_source_window_start[source_ip]
+            if now - window_start >= 1.0:
+                self._per_source_counts[source_ip] = 0
+                self._per_source_window_start[source_ip] = now
+
+            if self._per_source_counts[source_ip] >= settings.SYSLOG_MAX_PER_SOURCE_PER_SECOND:
+                return False
+            self._per_source_counts[source_ip] += 1
+
+        return True
+
+    def _parse_redaction_patterns(self) -> None:
+        """Parse SYSLOG_REDACTION_PATTERNS into compiled regexes (SEC-023)."""
+        raw = settings.SYSLOG_REDACTION_PATTERNS.strip()
+        if not raw:
+            return
+
+        for pattern_str in raw.split(","):
+            pattern_str = pattern_str.strip()
+            if not pattern_str:
+                continue
+            try:
+                self._redaction_patterns.append(re.compile(pattern_str))
+            except re.error:
+                logger.warning(
+                    "invalid_redaction_pattern",
+                    pattern=pattern_str,
+                    reason="Could not compile as regex — skipping.",
+                )
+
+    def _redact_payload(self, text: str) -> str:
+        """Apply redaction patterns to sensitive content (SEC-023).
+
+        Replaces matched sensitive values with [REDACTED].
+        """
+        for pattern in self._redaction_patterns:
+            text = pattern.sub("[REDACTED]", text)
+        return text
+
+    def _truncate_payload(self, text: str) -> str:
+        """Truncate payload to maximum stored size (SEC-023).
+
+        Appends [TRUNCATED] marker if content exceeds limit.
+        """
+        max_size = settings.SYSLOG_MAX_STORED_PAYLOAD
+        if max_size > 0 and len(text) > max_size:
+            return text[:max_size] + " [TRUNCATED]"
+        return text
+
     async def start(self) -> None:
         """Start the syslog collector."""
-        logger.info("Starting syslog collector", udp_port=settings.SYSLOG_UDP_PORT)
+        logger.info(
+            "Starting syslog collector",
+            udp_port=settings.SYSLOG_UDP_PORT,
+            max_message_size=settings.SYSLOG_MAX_MESSAGE_SIZE,
+            global_rate_limit=settings.SYSLOG_MAX_MESSAGES_PER_SECOND,
+            per_source_rate_limit=settings.SYSLOG_MAX_PER_SOURCE_PER_SECOND,
+            ip_allowlist_enabled=self._ip_allowlist_enabled,
+            allowed_networks_count=len(self._allowed_networks),
+            max_buffer_size=settings.SYSLOG_MAX_BUFFER_SIZE,
+            max_stored_payload=settings.SYSLOG_MAX_STORED_PAYLOAD,
+            redaction_patterns_count=len(self._redaction_patterns),
+        )
 
         # Connect to database
         self.db_pool = await asyncpg.create_pool(
@@ -73,6 +233,7 @@ class SyslogCollector:
         # Start background tasks
         asyncio.create_task(self.flush_buffer_periodically())
         asyncio.create_task(self.check_buffer_size_periodically())
+        asyncio.create_task(self._report_drop_metrics_periodically())
 
     async def stop(self) -> None:
         """Stop the syslog collector."""
@@ -94,13 +255,47 @@ class SyslogCollector:
         logger.info("Syslog collector stopped")
 
     async def process_message(self, data: bytes, addr: tuple[str, int]) -> None:
-        """Process an incoming syslog message."""
+        """Process an incoming syslog message.
+
+        Security checks applied in order:
+        1. Message size cap
+        2. IP allowlist
+        3. Rate limiting (global + per-source)
+        4. Backpressure (buffer fullness)
+        """
+        source_ip = addr[0]
+
         try:
+            # --- SEC-015: Size cap ---
+            if len(data) > settings.SYSLOG_MAX_MESSAGE_SIZE:
+                self._drops_oversized += 1
+                return
+
+            # --- SEC-015: IP allowlist ---
+            if not self._is_source_allowed(source_ip):
+                self._drops_ip_denied += 1
+                return
+
+            # --- SEC-015: Rate limiting ---
+            if not self._check_rate_limit(source_ip):
+                self._drops_rate_limited += 1
+                return
+
+            # --- SEC-015: Backpressure ---
+            if len(self.event_buffer) >= settings.SYSLOG_MAX_BUFFER_SIZE:
+                self._drops_backpressure += 1
+                return
+
             raw_message = data.decode("utf-8", errors="replace").strip()
-            source_ip = addr[0]
 
             # Parse the message
             parsed = parse_syslog_message(raw_message)
+
+            # --- SEC-023: Redact sensitive content before storage ---
+            stored_message = self._redact_payload(parsed.message)
+            stored_raw = self._redact_payload(raw_message)
+            # Truncate to max stored payload size
+            stored_raw = self._truncate_payload(stored_raw)
 
             # Create event record
             event = {
@@ -116,23 +311,29 @@ class SyslogCollector:
                 "proc_id": parsed.proc_id,
                 "msg_id": parsed.msg_id,
                 "structured_data": parsed.structured_data,
-                "message": parsed.message,
+                "message": stored_message,
                 "device_type": parsed.device_type,
                 "event_type": parsed.event_type,
-                "raw_message": raw_message,
+                "raw_message": stored_raw,
             }
 
             # Add to buffer
             async with self.buffer_lock:
+                # Re-check buffer size under lock to prevent race
+                if len(self.event_buffer) >= settings.SYSLOG_MAX_BUFFER_SIZE:
+                    self._drops_backpressure += 1
+                    return
                 self.event_buffer.append(event)
                 if len(self.event_buffer) >= self.batch_size:
                     await self._flush_buffer_internal()
+
+            self._total_accepted += 1
 
             # Publish to NATS for real-time streaming
             await self._publish_to_nats(event, parsed)
 
         except Exception as e:
-            logger.error("Failed to process syslog message", error=str(e), addr=addr)
+            logger.error("Failed to process syslog message", error=str(e), source_ip=source_ip)
 
     async def _publish_to_nats(self, event: dict[str, Any], parsed: ParsedSyslogMessage) -> None:
         """Publish event to NATS for real-time streaming."""
@@ -299,6 +500,38 @@ class SyslogCollector:
             await asyncio.sleep(self.buffer_check_interval)
             await self._manage_buffer_size()
 
+    async def _report_drop_metrics_periodically(self) -> None:
+        """Log drop metrics every 60 seconds for observability."""
+        while self.running:
+            await asyncio.sleep(60)
+            if (
+                self._drops_oversized
+                or self._drops_rate_limited
+                or self._drops_ip_denied
+                or self._drops_backpressure
+            ):
+                logger.warning(
+                    "syslog_collector_drop_metrics",
+                    accepted=self._total_accepted,
+                    drops_oversized=self._drops_oversized,
+                    drops_rate_limited=self._drops_rate_limited,
+                    drops_ip_denied=self._drops_ip_denied,
+                    drops_backpressure=self._drops_backpressure,
+                    buffer_size=len(self.event_buffer),
+                )
+            else:
+                logger.debug(
+                    "syslog_collector_metrics",
+                    accepted=self._total_accepted,
+                    buffer_size=len(self.event_buffer),
+                )
+            # Reset counters for next window
+            self._drops_oversized = 0
+            self._drops_rate_limited = 0
+            self._drops_ip_denied = 0
+            self._drops_backpressure = 0
+            self._total_accepted = 0
+
     async def _manage_buffer_size(self) -> None:
         """
         Manage the circular buffer size.
@@ -387,13 +620,23 @@ class SyslogCollector:
 
 
 class SyslogUDPProtocol(asyncio.DatagramProtocol):
-    """Asyncio UDP protocol for syslog reception."""
+    """Asyncio UDP protocol for syslog reception.
+
+    Performs a fast synchronous size check before spawning an async task
+    to avoid unnecessary coroutine overhead for oversized packets.
+    """
 
     def __init__(self, collector: SyslogCollector) -> None:
         self.collector = collector
 
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
-        """Handle incoming UDP datagram."""
+        """Handle incoming UDP datagram.
+
+        Fast-path rejection for oversized messages avoids async task creation.
+        """
+        if len(data) > settings.SYSLOG_MAX_MESSAGE_SIZE:
+            self.collector._drops_oversized += 1
+            return
         asyncio.create_task(self.collector.process_message(data, addr))
 
     def error_received(self, exc: Exception) -> None:

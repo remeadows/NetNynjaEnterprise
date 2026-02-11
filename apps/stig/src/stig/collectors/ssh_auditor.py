@@ -39,6 +39,13 @@ class SSHAuditor:
     async def connect(self, target: Target) -> asyncssh.SSHClientConnection | None:
         """Establish SSH connection to a target.
 
+        Requires valid credentials from Vault or explicit configuration.
+        Will NOT fall back to default credentials — fails loudly if
+        credentials are missing or Vault is unavailable.
+
+        Host key verification is enforced by default (STIG_SSH_STRICT_HOST_KEY=true).
+        Disable ONLY in isolated lab environments via environment variable.
+
         Args:
             target: Target to connect to
 
@@ -48,15 +55,55 @@ class SSHAuditor:
         if target.id in self._connections:
             return self._connections[target.id]
 
-        # Get credentials from Vault
+        # --- Credential retrieval (no fallback) ---
         credentials = None
         if target.credential_id:
             credentials = await self.vault.get_ssh_credentials(target.credential_id)
 
         if not credentials:
-            logger.warning("no_credentials_found", target_id=target.id)
-            # Try with default/no auth for development
-            credentials = {"username": "root", "password": ""}
+            logger.error(
+                "ssh_audit_blocked_no_credentials",
+                target_id=target.id,
+                host=target.ip_address,
+                credential_id=target.credential_id,
+                reason="No credentials available. Configure credentials in Vault or assign "
+                       "a credential_id to the target. Fallback credentials are not permitted.",
+            )
+            return None
+
+        username = credentials.get("username")
+        if not username:
+            logger.error(
+                "ssh_audit_blocked_no_username",
+                target_id=target.id,
+                host=target.ip_address,
+                reason="Credentials retrieved but username is missing or empty.",
+            )
+            return None
+
+        # --- Host key verification ---
+        known_hosts: Any  # asyncssh accepts str path, list, or None
+        if settings.ssh_strict_host_key:
+            # Use explicit known_hosts file or system default
+            if settings.ssh_known_hosts_file:
+                known_hosts = settings.ssh_known_hosts_file
+            else:
+                known_hosts = ()  # asyncssh default: uses ~/.ssh/known_hosts
+            logger.debug(
+                "ssh_host_key_verification_enabled",
+                target_id=target.id,
+                known_hosts_source=settings.ssh_known_hosts_file or "system_default",
+            )
+        else:
+            # Explicitly disabled — log as warning so it's visible in audit trail
+            known_hosts = None
+            logger.warning(
+                "ssh_host_key_verification_disabled",
+                target_id=target.id,
+                host=target.ip_address,
+                reason="STIG_SSH_STRICT_HOST_KEY is set to false. "
+                       "This is only acceptable in isolated lab environments.",
+            )
 
         try:
             port = target.port or settings.default_ssh_port
@@ -64,14 +111,22 @@ class SSHAuditor:
             conn_options: dict[str, Any] = {
                 "host": target.ip_address,
                 "port": port,
-                "username": credentials.get("username", "root"),
-                "known_hosts": None,  # Skip host key verification in dev
+                "username": username,
+                "known_hosts": known_hosts,
             }
 
-            if "password" in credentials:
+            if "password" in credentials and credentials["password"]:
                 conn_options["password"] = credentials["password"]
-            elif "private_key" in credentials:
+            elif "private_key" in credentials and credentials["private_key"]:
                 conn_options["client_keys"] = [credentials["private_key"]]
+            else:
+                logger.error(
+                    "ssh_audit_blocked_no_auth_method",
+                    target_id=target.id,
+                    host=target.ip_address,
+                    reason="Credentials have no password or private_key set.",
+                )
+                return None
 
             conn = await asyncio.wait_for(
                 asyncssh.connect(**conn_options),
@@ -79,11 +134,34 @@ class SSHAuditor:
             )
 
             self._connections[target.id] = conn
-            logger.info("ssh_connected", target_id=target.id, host=target.ip_address)
+            logger.info(
+                "ssh_connected",
+                target_id=target.id,
+                host=target.ip_address,
+                port=port,
+                username=username,
+                host_key_verified=settings.ssh_strict_host_key,
+            )
             return conn
 
+        except asyncssh.KeyImportError as e:
+            logger.error(
+                "ssh_host_key_mismatch",
+                target_id=target.id,
+                host=target.ip_address,
+                error=str(e),
+                action="Verify the target's host key and update known_hosts, "
+                       "or set STIG_SSH_KNOWN_HOSTS_FILE to a file containing "
+                       "the expected key.",
+            )
+            return None
         except asyncio.TimeoutError:
-            logger.error("ssh_timeout", target_id=target.id, host=target.ip_address)
+            logger.error(
+                "ssh_timeout",
+                target_id=target.id,
+                host=target.ip_address,
+                timeout=settings.default_ssh_timeout,
+            )
             return None
         except asyncssh.Error as e:
             logger.error(

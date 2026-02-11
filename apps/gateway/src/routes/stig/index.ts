@@ -265,6 +265,9 @@ const stigRoutes: FastifyPluginAsync = async (fastify) => {
   // Register audit group routes (STIG-13: Multi-STIG Support)
   fastify.register(auditGroupRoutes, { prefix: "/audit-groups" });
 
+  // APP-020: Register library proxy routes (browse/summary from STIG service)
+  fastify.register(libraryProxyRoutes, { prefix: "/library" });
+
   // =============================================================================
   // Report Routes
   // =============================================================================
@@ -1675,6 +1678,19 @@ const stigRoutes: FastifyPluginAsync = async (fastify) => {
           chunks.push(chunk as Buffer);
         }
         const fileBuffer = Buffer.concat(chunks);
+
+        // SEC-017: Enforce upload size limit for checklist files (50 MB)
+        const MAX_CHECKLIST_UPLOAD_BYTES = 50 * 1024 * 1024;
+        if (fileBuffer.length > MAX_CHECKLIST_UPLOAD_BYTES) {
+          reply.status(413);
+          return {
+            success: false,
+            error: {
+              code: "PAYLOAD_TOO_LARGE",
+              message: `Checklist file exceeds maximum size (${fileBuffer.length} bytes > ${MAX_CHECKLIST_UPLOAD_BYTES} bytes). Max: 50MB.`,
+            },
+          };
+        }
 
         let checklistData: {
           assetName: string;
@@ -3185,10 +3201,321 @@ function getTokenFromRequest(request: FastifyRequest): string | null {
 }
 
 // =============================================================================
+// Library Proxy Routes (APP-020: Proxy STIG Library browse/summary from Python)
+// =============================================================================
+
+const libraryProxyRoutes: FastifyPluginAsync = async (fastify) => {
+  // GET /library — Browse file-based STIG Library catalog
+  // Also available at /library/browse for explicit naming
+  fastify.get(
+    "/",
+    {
+      schema: {
+        tags: ["STIG - Library"],
+        summary: "Browse STIG Library catalog (file-based)",
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: "object",
+          properties: {
+            page: { type: "number", minimum: 1, default: 1 },
+            per_page: { type: "number", minimum: 1, maximum: 100, default: 50 },
+            platform: { type: "string" },
+            stig_type: { type: "string" },
+            search: { type: "string" },
+          },
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const token = getTokenFromRequest(request);
+      if (!token) {
+        reply.status(401);
+        return {
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "Missing token" },
+        };
+      }
+
+      const query = request.query as Record<string, string | number>;
+      const params = new URLSearchParams();
+      if (query.page) params.append("page", String(query.page));
+      if (query.per_page) params.append("per_page", String(query.per_page));
+      if (query.platform) params.append("platform", String(query.platform));
+      if (query.stig_type) params.append("stig_type", String(query.stig_type));
+      if (query.search) params.append("search", String(query.search));
+
+      try {
+        const result = await proxyToSTIGService(
+          "GET",
+          `/api/v1/stig/library?${params.toString()}`,
+          token,
+        );
+        reply.status(result.status);
+        return result.data;
+      } catch (err) {
+        logger.error({ err }, "Failed to proxy library browse to STIG service");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
+  // GET /library/summary — Library statistics
+  fastify.get(
+    "/summary",
+    {
+      schema: {
+        tags: ["STIG - Library"],
+        summary: "Get STIG Library summary statistics",
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const token = getTokenFromRequest(request);
+      if (!token) {
+        reply.status(401);
+        return {
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "Missing token" },
+        };
+      }
+
+      try {
+        const result = await proxyToSTIGService(
+          "GET",
+          "/api/v1/stig/library/summary",
+          token,
+        );
+        reply.status(result.status);
+        return result.data;
+      } catch (err) {
+        logger.error(
+          { err },
+          "Failed to proxy library summary to STIG service",
+        );
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
+  // GET /library/platforms/:platform — STIGs for a specific platform
+  fastify.get<{
+    Params: { platform: string };
+  }>(
+    "/platforms/:platform",
+    {
+      schema: {
+        tags: ["STIG - Library"],
+        summary: "Get STIGs applicable to a platform",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            platform: { type: "string" },
+          },
+          required: ["platform"],
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const token = getTokenFromRequest(request);
+      if (!token) {
+        reply.status(401);
+        return {
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "Missing token" },
+        };
+      }
+
+      const { platform } = request.params as { platform: string };
+
+      try {
+        const result = await proxyToSTIGService(
+          "GET",
+          `/api/v1/stig/library/platforms/${encodeURIComponent(platform)}`,
+          token,
+        );
+        reply.status(result.status);
+        return result.data;
+      } catch (err) {
+        logger.error(
+          { err },
+          "Failed to proxy library platforms to STIG service",
+        );
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
+  // POST /library/rescan — Rebuild STIG Library index (admin only)
+  fastify.post(
+    "/rescan",
+    {
+      schema: {
+        tags: ["STIG - Library"],
+        summary: "Rescan STIG Library and rebuild index",
+        security: [{ bearerAuth: [] }],
+      },
+      preHandler: [fastify.requireAuth, fastify.requireRole("admin")],
+    },
+    async (request, reply) => {
+      const token = getTokenFromRequest(request);
+      if (!token) {
+        reply.status(401);
+        return {
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "Missing token" },
+        };
+      }
+
+      try {
+        const result = await proxyToSTIGService(
+          "POST",
+          "/api/v1/stig/library/rescan",
+          token,
+        );
+        reply.status(result.status);
+        return result.data;
+      } catch (err) {
+        logger.error({ err }, "Failed to proxy library rescan to STIG service");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+};
+
+// =============================================================================
 // Target Configuration Analysis Routes (Proxy to STIG Service)
 // =============================================================================
 
 const targetRoutes: FastifyPluginAsync = async (fastify) => {
+  // APP-020: List targets (proxy to STIG service) — alias for /assets
+  fastify.get(
+    "/",
+    {
+      schema: {
+        tags: ["STIG - Targets"],
+        summary: "List STIG targets (alias for /assets)",
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: "object",
+          properties: {
+            page: { type: "number", minimum: 1, default: 1 },
+            per_page: { type: "number", minimum: 1, maximum: 100, default: 20 },
+            platform: { type: "string" },
+            is_active: { type: "boolean" },
+            search: { type: "string" },
+          },
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const token = getTokenFromRequest(request);
+      if (!token) {
+        reply.status(401);
+        return {
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "Missing token" },
+        };
+      }
+
+      const query = request.query as Record<string, string | number>;
+      const params = new URLSearchParams();
+      if (query.page) params.append("page", String(query.page));
+      if (query.per_page) params.append("per_page", String(query.per_page));
+      if (query.platform) params.append("platform", String(query.platform));
+      if (query.is_active) params.append("is_active", String(query.is_active));
+      if (query.search) params.append("search", String(query.search));
+
+      try {
+        const result = await proxyToSTIGService(
+          "GET",
+          `/api/v1/stig/targets?${params.toString()}`,
+          token,
+        );
+        reply.status(result.status);
+        return result.data;
+      } catch (err) {
+        logger.error({ err }, "Failed to proxy target list to STIG service");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
+  // APP-020: Get target by ID (proxy to STIG service)
+  fastify.get<{
+    Params: { targetId: string };
+  }>(
+    "/:targetId",
+    {
+      schema: {
+        tags: ["STIG - Targets"],
+        summary: "Get STIG target by ID",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            targetId: { type: "string", format: "uuid" },
+          },
+          required: ["targetId"],
+        },
+      },
+      preHandler: [fastify.requireAuth],
+    },
+    async (request, reply) => {
+      const token = getTokenFromRequest(request);
+      if (!token) {
+        reply.status(401);
+        return {
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "Missing token" },
+        };
+      }
+
+      const { targetId } = request.params as { targetId: string };
+
+      try {
+        const result = await proxyToSTIGService(
+          "GET",
+          `/api/v1/stig/targets/${targetId}`,
+          token,
+        );
+        reply.status(result.status);
+        return result.data;
+      } catch (err) {
+        logger.error({ err }, "Failed to proxy target get to STIG service");
+        reply.status(502);
+        return {
+          success: false,
+          error: { code: "BAD_GATEWAY", message: "STIG service unavailable" },
+        };
+      }
+    },
+  );
+
   // Analyze target configuration file
   fastify.post(
     "/:targetId/analyze-config",
@@ -3243,6 +3570,19 @@ const targetRoutes: FastifyPluginAsync = async (fastify) => {
           chunks.push(chunk as Buffer);
         }
         const fileBuffer = Buffer.concat(chunks);
+
+        // SEC-017: Enforce upload size limit for config files (10 MB)
+        const MAX_CONFIG_UPLOAD_BYTES = 10 * 1024 * 1024;
+        if (fileBuffer.length > MAX_CONFIG_UPLOAD_BYTES) {
+          reply.status(413);
+          return {
+            success: false,
+            error: {
+              code: "PAYLOAD_TOO_LARGE",
+              message: `Configuration file exceeds maximum size (${fileBuffer.length} bytes > ${MAX_CONFIG_UPLOAD_BYTES} bytes). Max: 10MB.`,
+            },
+          };
+        }
 
         // Get definition_id from form fields
         const fields = data.fields as Record<string, { value: string }>;

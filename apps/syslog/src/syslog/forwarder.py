@@ -67,14 +67,43 @@ class SyslogForwarder:
             name=self.config.name,
             target=f"{self.config.target_host}:{self.config.target_port}",
             protocol=self.config.protocol,
+            tls_enabled=self.config.tls_enabled,
+            tls_verify=self.config.tls_verify,
         )
 
-        # Set up TLS if needed
-        if self.config.protocol == "tls" or self.config.tls_enabled:
+        # SEC-022: TLS setup with hardened defaults
+        use_tls = self.config.protocol == "tls" or self.config.tls_enabled
+        if use_tls:
             self.ssl_context = ssl.create_default_context()
+
+            # Load custom CA certificate if configured
+            ca_cert = settings.SYSLOG_FORWARD_TLS_CA_CERT.strip()
+            if ca_cert:
+                self.ssl_context.load_verify_locations(ca_cert)
+                logger.info(
+                    "forwarder_tls_custom_ca_loaded",
+                    name=self.config.name,
+                    ca_cert=ca_cert,
+                )
+
             if not self.config.tls_verify:
+                # Warn loudly when TLS verification is disabled
+                logger.warning(
+                    "forwarder_tls_verification_disabled",
+                    name=self.config.name,
+                    target=f"{self.config.target_host}:{self.config.target_port}",
+                    risk="MITM attacks possible — enable tls_verify for production",
+                )
                 self.ssl_context.check_hostname = False
                 self.ssl_context.verify_mode = ssl.CERT_NONE
+        elif self.config.protocol == "tcp" and settings.SYSLOG_FORWARD_TLS_DEFAULT:
+            # SEC-022: Warn when TCP forwarder is not using TLS in TLS-default mode
+            logger.warning(
+                "forwarder_tls_not_enabled",
+                name=self.config.name,
+                protocol=self.config.protocol,
+                risk="Syslog forwarded in cleartext — set protocol='tls' or tls_enabled=true",
+            )
 
         self.running = True
 

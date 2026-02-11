@@ -54,6 +54,47 @@ class Settings(BaseSettings):
     max_concurrent_audits: int = Field(default=5, alias="MAX_CONCURRENT_AUDITS")
     audit_result_retention_days: int = Field(default=365, alias="AUDIT_RETENTION_DAYS")
 
+    # SSH Security settings
+    ssh_strict_host_key: bool = Field(
+        default=True,
+        alias="STIG_SSH_STRICT_HOST_KEY",
+        description="Enforce SSH host key verification. Only disable in isolated lab environments.",
+    )
+    ssh_known_hosts_file: str | None = Field(
+        default=None,
+        alias="STIG_SSH_KNOWN_HOSTS_FILE",
+        description="Path to SSH known_hosts file. Uses system default if not set.",
+    )
+
+    # Config upload size limit (SEC-017)
+    max_config_upload_size: int = Field(
+        default=10 * 1024 * 1024,  # 10 MB
+        alias="STIG_MAX_UPLOAD_SIZE",
+        description="Maximum config file upload size in bytes. Returns 413 if exceeded.",
+    )
+    allowed_config_extensions: str = Field(
+        default=".txt,.xml,.conf,.cfg",
+        alias="STIG_ALLOWED_CONFIG_EXTENSIONS",
+        description="Comma-separated list of allowed config file extensions.",
+    )
+
+    # XML/ZIP upload size limits (SEC-016)
+    max_xml_size: int = Field(
+        default=50 * 1024 * 1024,  # 50 MB
+        alias="STIG_MAX_XML_SIZE",
+        description="Maximum allowed XML file size in bytes for XCCDF/CKL parsing.",
+    )
+    max_zip_entry_size: int = Field(
+        default=100 * 1024 * 1024,  # 100 MB
+        alias="STIG_MAX_ZIP_ENTRY_SIZE",
+        description="Maximum allowed size of a single file extracted from a STIG ZIP.",
+    )
+    max_zip_entries: int = Field(
+        default=500,
+        alias="STIG_MAX_ZIP_ENTRIES",
+        description="Maximum number of entries allowed in a STIG ZIP archive.",
+    )
+
     # Report settings
     report_output_dir: str = Field(default="/app/output", alias="REPORT_OUTPUT_DIR")
     report_template_dir: str = Field(default="/app/templates", alias="REPORT_TEMPLATE_DIR")

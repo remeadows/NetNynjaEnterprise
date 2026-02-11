@@ -11,11 +11,17 @@ import { logger } from "../../logger";
 import { config } from "../../config";
 
 // Encryption utilities using AES-256-GCM (FIPS compliant)
+// SEC-018: Per-record random salt for scrypt key derivation.
+// Each encrypted value gets its own unique derived key, limiting blast
+// radius if the master encryption key is compromised.
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
+const SALT_LENGTH = 16;
 
 function encrypt(text: string): string {
-  const key = crypto.scryptSync(config.CREDENTIAL_ENCRYPTION_KEY, "salt", 32);
+  // SEC-018: Generate unique random salt per record
+  const salt = crypto.randomBytes(SALT_LENGTH);
+  const key = crypto.scryptSync(config.CREDENTIAL_ENCRYPTION_KEY, salt, 32);
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
@@ -23,22 +29,36 @@ function encrypt(text: string): string {
   encrypted += cipher.final("hex");
   const authTag = cipher.getAuthTag();
 
-  // Format: iv:authTag:encrypted
-  return `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted}`;
+  // New format (4 parts): salt:iv:authTag:encrypted
+  return `${salt.toString("hex")}:${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted}`;
 }
 
 function decrypt(encryptedData: string): string {
-  const key = crypto.scryptSync(config.CREDENTIAL_ENCRYPTION_KEY, "salt", 32);
   const parts = encryptedData.split(":");
 
-  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) {
+  let salt: Buffer;
+  let ivHex: string;
+  let authTagHex: string;
+  let encrypted: string;
+
+  if (parts.length === 4 && parts[0] && parts[1] && parts[2] && parts[3]) {
+    // SEC-018: New format with per-record salt — salt:iv:authTag:encrypted
+    salt = Buffer.from(parts[0], "hex");
+    ivHex = parts[1];
+    authTagHex = parts[2];
+    encrypted = parts[3];
+  } else if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
+    // Legacy format (pre-SEC-018): iv:authTag:encrypted with static "salt"
+    // Backward compatible — will decrypt existing credentials without migration
+    salt = Buffer.from("salt");
+    ivHex = parts[0];
+    authTagHex = parts[1];
+    encrypted = parts[2];
+  } else {
     throw new Error("Invalid encrypted data format");
   }
 
-  const ivHex = parts[0];
-  const authTagHex = parts[1];
-  const encrypted = parts[2];
-
+  const key = crypto.scryptSync(config.CREDENTIAL_ENCRYPTION_KEY, salt, 32);
   const iv = Buffer.from(ivHex, "hex");
   const authTag = Buffer.from(authTagHex, "hex");
 
