@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "shared-python"
+version = "0.2.15"
+description = "NetNynja Enterprise - Shared Python library for backend services"
+authors = ["NetNynja Team"]
+packages = [
+    { include = "shared_python", from = "src" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.13"
+asyncpg = "^0.29.0"
+fastapi = ">=0.104.0"
+pydantic = "^2.5.2"
+pydantic-settings = "^2.1.0"
+structlog = "^23.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

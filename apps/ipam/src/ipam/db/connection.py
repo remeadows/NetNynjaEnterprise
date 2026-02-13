@@ -1,4 +1,9 @@
-"""PostgreSQL connection pool management."""
+"""PostgreSQL connection pool management — delegates to shared_python.DatabasePool.
+
+Maintains backward-compatible module-level exports (init_db, close_db,
+get_db, get_pool, transaction, check_health) so existing IPAM code
+doesn't need import changes.
+"""
 
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -6,78 +11,54 @@ from typing import AsyncGenerator
 import asyncpg
 from asyncpg import Pool
 
+from shared_python import DatabasePool
+
 from ..core.config import settings
 from ..core.logging import get_logger
 
 logger = get_logger(__name__)
 
-_pool: Pool | None = None
+# Canonical DatabasePool instance — imported by main.py for app_factory
+db_pool = DatabasePool(
+    dsn=str(settings.postgres_url),
+    schema="ipam,shared,public",
+    min_size=settings.db_pool_min,
+    max_size=settings.db_pool_max,
+    command_timeout=60,
+    max_retries=5,
+    retry_delay=2.0,
+)
 
 
 async def init_db() -> None:
-    """Initialize the database connection pool."""
-    global _pool
-
-    if _pool is not None:
-        return
-
-    logger.info("initializing_database_pool", url=str(settings.postgres_url).split("@")[-1])
-
-    _pool = await asyncpg.create_pool(
-        str(settings.postgres_url),
-        min_size=settings.db_pool_min,
-        max_size=settings.db_pool_max,
-        command_timeout=60,
-        server_settings={
-            "search_path": "ipam,shared,public",
-        },
-    )
-
-    logger.info("database_pool_initialized", min_size=settings.db_pool_min, max_size=settings.db_pool_max)
+    """Initialize the database connection pool with retry/backoff."""
+    await db_pool.init()
 
 
 async def close_db() -> None:
     """Close the database connection pool."""
-    global _pool
-
-    if _pool is None:
-        return
-
-    logger.info("closing_database_pool")
-    await _pool.close()
-    _pool = None
+    await db_pool.close()
 
 
 def get_pool() -> Pool:
-    """Get the database connection pool."""
-    if _pool is None:
-        raise RuntimeError("Database pool not initialized. Call init_db() first.")
-    return _pool
+    """Get the raw asyncpg pool."""
+    return db_pool.pool
 
 
 @asynccontextmanager
 async def get_db() -> AsyncGenerator[asyncpg.Connection, None]:
     """Get a database connection from the pool."""
-    pool = get_pool()
-    async with pool.acquire() as connection:
+    async with db_pool.acquire() as connection:
         yield connection
 
 
 @asynccontextmanager
 async def transaction() -> AsyncGenerator[asyncpg.Connection, None]:
     """Get a database connection with an active transaction."""
-    pool = get_pool()
-    async with pool.acquire() as connection:
-        async with connection.transaction():
-            yield connection
+    async with db_pool.transaction() as connection:
+        yield connection
 
 
 async def check_health() -> bool:
     """Check database connectivity."""
-    try:
-        async with get_db() as conn:
-            await conn.fetchval("SELECT 1")
-        return True
-    except Exception as e:
-        logger.error("database_health_check_failed", error=str(e))
-        return False
+    return await db_pool.check_health()

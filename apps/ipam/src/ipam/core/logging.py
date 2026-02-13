@@ -1,73 +1,25 @@
-"""Structured logging configuration."""
+"""Structured logging configuration — delegates to shared_python.
 
-import logging
-import sys
-from typing import Any
+Maintains backward-compatible imports for the IPAM service.
+The IPAM-specific configure_logging() reads settings.log_level and
+settings.is_development automatically so callers don't need to pass args.
+"""
 
-import structlog
-from structlog.types import Processor
+from shared_python import (
+    configure_logging as _configure_logging,
+    get_logger,
+    bind_context,
+    clear_context,
+)
 
 from .config import settings
 
+__all__ = ["configure_logging", "get_logger", "bind_context", "clear_context"]
+
 
 def configure_logging() -> None:
-    """Configure structured logging with structlog."""
-    shared_processors: list[Processor] = [
-        structlog.contextvars.merge_contextvars,
-        structlog.processors.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.UnicodeDecoder(),
-    ]
-
-    if settings.is_development:
-        # Pretty console output for development
-        structlog.configure(
-            processors=[
-                *shared_processors,
-                structlog.dev.ConsoleRenderer(colors=True),
-            ],
-            wrapper_class=structlog.make_filtering_bound_logger(
-                getattr(logging, settings.log_level.upper())
-            ),
-            context_class=dict,
-            logger_factory=structlog.PrintLoggerFactory(),
-            cache_logger_on_first_use=True,
-        )
-    else:
-        # JSON output for production (Loki-compatible)
-        structlog.configure(
-            processors=[
-                *shared_processors,
-                structlog.processors.format_exc_info,
-                structlog.processors.JSONRenderer(),
-            ],
-            wrapper_class=structlog.make_filtering_bound_logger(
-                getattr(logging, settings.log_level.upper())
-            ),
-            context_class=dict,
-            logger_factory=structlog.PrintLoggerFactory(),
-            cache_logger_on_first_use=True,
-        )
-
-    # Configure standard library logging to use structlog
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=getattr(logging, settings.log_level.upper()),
+    """Configure logging using IPAM settings."""
+    _configure_logging(
+        log_level=settings.log_level,
+        is_development=settings.is_development,
     )
-
-
-def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
-    """Get a structured logger instance."""
-    return structlog.get_logger(name)
-
-
-def bind_context(**kwargs: Any) -> None:
-    """Bind context variables for all subsequent log calls."""
-    structlog.contextvars.bind_contextvars(**kwargs)
-
-
-def clear_context() -> None:
-    """Clear all context variables."""
-    structlog.contextvars.clear_contextvars()

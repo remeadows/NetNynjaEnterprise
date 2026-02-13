@@ -5,7 +5,7 @@ description = "NetNynja Enterprise - Python Services"
 authors = ["NetNynja Team"]
 readme = "README.md"
 packages = [
-    { include = "shared", from = "services" },
+    { include = "shared_python", from = "services/shared-python/src" },
 ]
 
 [tool.poetry.dependencies]
@@ -196,7 +196,7 @@ ignore = [
 "**/conftest.py" = ["ARG"]
 
 [tool.ruff.isort]
-known-first-party = ["shared", "ipam", "npm", "stig"]
+known-first-party = ["shared_python", "ipam", "npm", "stig"]
 force-single-line = false
 lines-after-imports = 2
 

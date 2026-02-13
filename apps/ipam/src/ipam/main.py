@@ -1,88 +1,46 @@
-"""IPAM service main application."""
+"""IPAM service main application.
 
-import asyncio
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+Uses shared_python.create_service_app for standardized bootstrap.
+NATS lifecycle is passed as startup/shutdown hooks.
+"""
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from shared_python import create_service_app, get_logger
 
 from .core.config import settings
-from .core.logging import configure_logging, get_logger
-from .db.connection import init_db, close_db
+from .db.connection import db_pool
 from .api import router, health_router
 from .collectors.nats_handler import NATSHandler
 
-configure_logging()
 logger = get_logger(__name__)
 
-# NATS handler instance
-nats_handler: NATSHandler | None = None
+# --- NATS lifecycle hooks ---
+
+nats_handler = NATSHandler()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application lifespan manager."""
-    global nats_handler
-
-    logger.info(
-        "starting_ipam_service",
-        environment=settings.environment,
-        host=settings.host,
-        port=settings.port,
-    )
-
-    # Initialize database pool
-    await init_db()
-
-    # Connect to NATS
-    try:
-        nats_handler = NATSHandler()
-        await nats_handler.connect()
-        await nats_handler.start_consumers()
-    except Exception as e:
-        logger.warning("nats_connection_skipped", error=str(e))
-        nats_handler = None
-
-    yield
-
-    # Cleanup
-    logger.info("shutting_down_ipam_service")
-
-    if nats_handler:
-        await nats_handler.disconnect()
-
-    await close_db()
+async def _start_nats() -> None:
+    """Connect NATS and start consumers."""
+    await nats_handler.connect()
+    await nats_handler.start_consumers()
 
 
-def create_app() -> FastAPI:
-    """Create and configure the FastAPI application."""
-    app = FastAPI(
-        title="NetNynja IPAM Service",
-        description="IP Address Management microservice",
-        version="0.1.0",
-        lifespan=lifespan,
-        docs_url="/docs" if settings.is_development else None,
-        redoc_url="/redoc" if settings.is_development else None,
-    )
-
-    # CORS middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"] if settings.is_development else [],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    # Register routes
-    app.include_router(health_router)
-    app.include_router(router)
-
-    return app
+async def _stop_nats() -> None:
+    """Disconnect NATS gracefully."""
+    await nats_handler.disconnect()
 
 
-app = create_app()
+# --- Application ---
+
+app = create_service_app(
+    title="NetNynja IPAM Service",
+    description="IP Address Management microservice",
+    version="0.2.15",
+    settings=settings,
+    db=db_pool,
+    routers=[health_router, router],
+    on_startup=[_start_nats],
+    on_shutdown=[_stop_nats],
+)
 
 
 if __name__ == "__main__":
