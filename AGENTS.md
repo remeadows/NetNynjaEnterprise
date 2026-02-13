@@ -16,17 +16,19 @@ If there is ambiguity, follow these rules instead of guessing.
 
 ---
 
-## 1) Mandatory Startup Sequence
+## 1) Mandatory Startup Sequence (Canonical — Single Source of Truth)
 
-At the start of every session, read these files **in order**:
+At the start of every session, read these files **in this exact order**:
 
-1. `GO.md` (execution entrypoint)
-2. `AGENTS.md` (this file)
-3. `CLAUDE.md` (tool-specific behavior)
-4. `CONTEXT.md` (architecture & constraints)
-5. `PROJECT_STATUS.md` (current state)
-6. `IssuesTracker.md` (work queue)
-7. `README.md` (human-facing overview)
+1. `GO.md` (execution objectives — what to produce)
+2. `AGENTS.md` (this file — how to operate)
+3. `CLAUDE.md` (tool conventions & repo structure)
+4. `CLAUDE_ENTERPRISE_SKILL.md` (engineering standards & module blueprints)
+5. `CONTEXT.md` (architecture & constraints)
+6. `PROJECT_STATUS.md` (current state)
+7. `IssuesTracker.md` (work queue)
+8. `README.md` (human-facing overview)
+9. `COMMIT.md` (commit & CI workflow)
 
 ### Required Session Header (always output)
 

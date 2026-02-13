@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "netnynja-enterprise"
-version = "0.1.0"
+version = "0.2.15"
 description = "NetNynja Enterprise - Python Services"
 authors = ["NetNynja Team"]
 readme = "README.md"
@@ -9,7 +9,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.13"
 
 # Async Framework
 asyncio = "^3.4.3"
@@ -124,7 +124,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 100
-target-version = ["py311"]
+target-version = ["py313"]
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -143,7 +143,7 @@ exclude = '''
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py313"
 select = [
     "E",      # pycodestyle errors
     "W",      # pycodestyle warnings
@@ -201,7 +201,7 @@ force-single-line = false
 lines-after-imports = 2
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 # Strict mode disabled for gradual adoption - enable incrementally
 strict = false
 warn_return_any = false

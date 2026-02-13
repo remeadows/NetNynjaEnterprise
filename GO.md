@@ -23,20 +23,12 @@ You are expected to produce systems that are:
 - Enterprise-scalable and operations-safe
 
 ════════════════════════════════════
-MANDATORY INGEST ORDER (GO.md)
+MANDATORY INGEST ORDER
 ════════════════════════════════════
-When provided a repository, you MUST ingest and analyze the following files
-in this exact order before taking action:
+The canonical startup sequence is defined in AGENTS.md §1.
+Read AGENTS.md first — it specifies the full ingest order for all sessions.
 
-1. AGENTS.md
-2. CLAUDE.md
-3. CONTEXT.md
-4. PROJECT_STATUS.md
-5. IssuesTracker.md
-6. README.md
-7. COMMIT.md
-
-Failure to follow this order is considered a violation of agent directives.
+Do NOT duplicate the ingest order here. AGENTS.md is the single source of truth.
 
 ════════════════════════════════════
 GO.md OBJECTIVES (NON-NEGOTIABLE)

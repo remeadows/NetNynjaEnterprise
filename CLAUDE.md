@@ -20,14 +20,14 @@ Target deployment platforms: macOS, Red Hat Enterprise Linux 9.x, Windows 11/Ser
 - All internal service communication over TLS
 - Container images scanned with Trivy before deployment
 
-### Technology Standards
+### Technology Standards (Verified 2026-02-13)
 
-- **API Gateway**: Node.js 20+ / Fastify 4.25 / TypeScript 5.3+
-- **Frontend**: React 18 / TypeScript / Tailwind CSS 3.4 / Vite 5
-- **Python Services**: Python 3.11+ with AsyncIO
+- **API Gateway**: Node.js 20+ / Fastify 5.2 / TypeScript 5.3+
+- **Frontend**: React 18 / TypeScript / Tailwind CSS 3.4 / Vite 7.3
+- **Python Services**: Python 3.13+ with AsyncIO
 - **Database**: PostgreSQL 15+ (primary), VictoriaMetrics (time-series), Redis 7+ (cache)
 - **Messaging**: NATS 2.10 with JetStream
-- **Observability**: Grafana 10.2 / Prometheus 2.48 / Loki 2.9 / Jaeger 1.51
+- **Observability**: Grafana 11.4 / Prometheus 2.48 / Loki 2.9 / Jaeger 1.51
 
 ## Repository Structure
 

@@ -9,9 +9,9 @@
 | Field                     | Value      |
 | ------------------------- | ---------- |
 | **Start Date**            | 2026-01-06 |
-| **End Date**              | 2026-01-14 |
-| **Total Issues Archived** | 123        |
-| **Archive Created**       | 2026-01-14 |
+| **End Date**              | 2026-02-12 |
+| **Total Issues Archived** | 191        |
+| **Last Updated**          | 2026-02-13 |
 
 ---
 
@@ -132,6 +132,83 @@
 | CI-011  | 🟡  | Gateway DTS generation                   | 2026-01-11 | Changed to --no-dts                                            |
 | CI-013  | 🟡  | shared-types module not found            | 2026-01-14 | Simplified package exports                                     |
 | WIN-001 | 🟠  | Windows Hyper-V port conflicts           | 2026-01-14 | Changed NATS/Vault ports                                       |
+
+---
+
+## Resolved Issues (2026-01-14 to 2026-02-12)
+
+| ID         | P   | Title                                   | Resolved   | Resolution                                                    |
+| ---------- | --- | --------------------------------------- | ---------- | ------------------------------------------------------------- |
+| STIG-023   | 🔴  | Audit-All 422 - missing body wrapper    | 2026-02-12 | Wrapped proxy body in {"data": {...}} matching STIG-021 pattern|
+| NPM-001    | 🟠  | SNMPv3 credential test timeout          | 2026-02-12 | User confirmed working — timeout/retry increases resolved it  |
+| UI-017     | 🟢  | React Router v7 migration warnings      | 2026-02-12 | Added v7_startTransition + v7_relativeSplatPath future flags  |
+| NPM-004    | 🟠  | Arista CPU/Memory OIDs not working      | 2026-02-12 | Walk hrProcessorLoad + hrStorageTable for Arista/generic      |
+| APP-021    | 🟡  | Syslog stats endpoint missing           | 2026-02-12 | Added GET /api/v1/syslog/stats with event count + last event  |
+| APP-020    | 🟡  | Gateway STIG route mismatch (404s)      | 2026-02-11 | Added /targets proxy + library browse/summary/platforms proxy |
+| SEC-023    | 🟠  | Raw payload redaction + size limits     | 2026-02-11 | Redaction patterns + 4KB truncation before DB storage         |
+| SEC-022    | 🟠  | Syslog forwarding TLS not enforced      | 2026-02-11 | TLS default, CA cert config, cleartext warnings               |
+| SEC-021    | 🟠  | Container caps excessive (NET_ADMIN)    | 2026-02-11 | cap_drop ALL on all 14 services, minimum cap_add only         |
+| SEC-020    | 🟠  | Syslog print() + CORS wildcard          | 2026-02-11 | structlog, CORS restricted to configurable origins            |
+| SEC-019    | 🟠  | Input sanitization audit                | 2026-02-11 | Full audit: all SQL parameterized, no shell injection         |
+| SEC-018    | 🟠  | Credential encryption static salt       | 2026-02-11 | Per-record random salt, backward-compatible decrypt           |
+| SEC-001    | 🟠  | tar RCE in argon2 dependency chain      | 2026-02-11 | Updated argon2 ^0.31.2 → ^0.41.1, eliminated tar dep         |
+| SEC-017    | 🔴  | Config upload no size limits            | 2026-02-11 | 413 enforcement in gateway + backend, configurable limits     |
+| SEC-016    | 🔴  | Unhardened XML parsing (XXE risk)       | 2026-02-11 | defusedxml for all parsing, XML/ZIP size limits added         |
+| SEC-015    | 🔴  | Syslog collector no rate/size limits    | 2026-02-11 | Rate limits, size caps, IP allowlist, backpressure added      |
+| SEC-014    | 🔴  | Production secrets in docker-compose    | 2026-02-11 | docker-compose.prod.yml overlay + validate-prod-env.sh        |
+| SEC-013    | 🔴  | SSH auditor fallback credentials        | 2026-02-11 | Removed fallback, enforced host key verification              |
+| SEC-012a   | 🔴  | Vault auth bypass CVE-2024-41110        | 2026-02-04 | Upgraded Vault 1.15 → 1.18                                    |
+| SEC-012b   | 🔴  | Grafana info leak CVE-2024-8986         | 2026-02-04 | Upgraded Grafana 10.2.0 → 11.4.0                              |
+| SEC-012c   | 🟠  | Fastify v4 → v5 security upgrade       | 2026-02-04 | Updated gateway + auth-service to Fastify 5.2.0               |
+| SEC-012d   | 🟠  | Python 3.11 OpenSSL vulnerabilities     | 2026-02-04 | Updated all Python services to 3.13-slim-bookworm             |
+| SYSLOG-002 | 🟠  | Syslog source stats showing 0 events    | 2026-02-04 | Added UNIQUE constraint migration 013, backfill stats         |
+| STIG-021   | 🟠  | STIG audit 422 Unprocessable Entity     | 2026-02-04 | Fixed gateway body wrapper for FastAPI {"data": {...}}        |
+| STIG-022   | 🟠  | STIG assignment 500 error               | 2026-02-04 | Applied migration 010_add_target_definitions.sql              |
+| APP-019    | 🔴  | Auth refresh returns 200 instead of 401 | 2026-02-02 | Changed to reply.status(401).send() pattern in auth-service   |
+| APP-018    | 🔴  | Syslog events API 500 error             | 2026-02-02 | Fixed SQL parameter indexing, added try-catch error handler   |
+| STIG-020   | 🟠  | Mellanox AAA parsing missing            | 2026-02-02 | Added AAA/TACACS/RADIUS parsing to MellanoxParser             |
+| CI-003     | 🔴  | TypeScript compilation errors           | 2026-01-18 | Fixed 5 TS errors in gateway STIG routes (79bcf10)            |
+| CI-002     | 🔴  | Missing source files (gitignore)        | 2026-01-18 | Root-anchored STIG/ pattern, added 3 files (97bc2e1)          |
+| CI-001     | 🔴  | CI/CD pipeline failures (Rollup ARM64)  | 2026-01-18 | Clean reinstall, audit trail, all workflows pass (8461bbb)    |
+| STIG-19    | 🟠  | Combined PDF for multi-STIG analysis    | 2026-01-18 | New combined-pdf/ckl endpoints with executive summary         |
+| STIG-18    | 🟠  | Config analysis only first STIG         | 2026-01-18 | Loop through all enabled STIGs, aggregate results             |
+| STIG-17    | 🟡  | PDF description raw XML tags            | 2026-01-18 | extract_vuln_discussion() + clean_text_for_pdf()              |
+| STIG-16    | 🟠  | CKL report missing V-ID details         | 2026-01-18 | Enhanced CKL exporter with rule details from database         |
+| STIG-15    | 🟠  | PDF report missing V-ID details         | 2026-01-18 | Added full description and fix text to PDF findings           |
+| STIG-14    | 🟠  | Config analysis requires STIG selection | 2026-01-18 | Auto-use assigned STIGs for config analysis                   |
+| STIG-500   | 🔴  | SSH Credentials 500 Error               | 2026-01-18 | Applied migration 008_add_ssh_credentials_sudo.sql            |
+| STIG-13    | 🔴  | Multi-STIG selection for assets         | 2026-01-17 | Target-STIG associations, batch audits, combined PDF/CKL      |
+| STIG-12    | 🔴  | Report PDF/CKL download fails           | 2026-01-17 | Fixed config import, Pydantic model access, enhanced report   |
+| STIG-11    | 🟠  | Config analysis 401 Unauthorized        | 2026-01-16 | Fixed frontend to use api client with auth header             |
+| STIG-10    | 🟠  | Config analysis 404 gateway route       | 2026-01-16 | Added proxy route in gateway for STIG service                 |
+| STIG-09    | 🟠  | SSH audit endpoint proxy missing        | 2026-01-16 | Added audit routes proxy to gateway (STIG service)            |
+| STIG-08    | 🟠  | STIG Library XCCDF indexer              | 2026-01-16 | Created library module: catalog, parser, indexer              |
+| STIG-07    | 🟠  | STIG Library API endpoints              | 2026-01-16 | Added 6 API endpoints for browsing/searching library          |
+| STIG-06    | 🟠  | Config file analysis feature            | 2026-01-16 | Added parsers for 6 platforms, API endpoint, UI modal         |
+| CI-017     | 🔴  | Turbo/ESLint compatibility              | 2026-01-16 | Created ESLint 9.x flat config (eslint.config.mjs)            |
+| APP-016    | 🔴  | Syslog forwarder crash (missing DB)     | 2026-01-16 | Created migration 009_add_syslog_forwarders.sql               |
+| APP-017    | 🟠  | E2E tests blocked by artifacts          | 2026-01-16 | Fixed CI workflow path, updated .gitignore                    |
+| DOC-001    | 🟢  | STIG Selection Guide                    | 2026-01-16 | Created docs/STIG_SELECTION_GUIDE.md                          |
+| CI-012     | 🟠  | Vite 5.x to 7.x upgrade               | 2026-01-15 | Upgraded Vite 7.3.1, fixed cross-spawn/glob CVEs              |
+| CI-015     | 🟠  | Tests workflow failing                  | 2026-01-15 | Added --passWithNoTests to Jest config                        |
+| CI-016     | 🟡  | E2E cleanup step failing                | 2026-01-15 | Added fallback to docker compose down in CI                   |
+| SEC-010    | 🟠  | Container security vulnerability scan   | 2026-01-15 | Docker Scout scan completed, report generated                 |
+| DOC-003    | 🟢  | Code signing implementation guide       | 2026-01-15 | Created CODE_SIGNING_GUIDE.md with Cosign/GPG docs            |
+| INFRA-8    | 🟠  | Container image signing and publishing  | 2026-01-15 | All 14 images signed with Cosign, pushed to GHCR              |
+| UI-016     | 🟢  | ISSO Executive Summary document         | 2026-01-15 | Created HTML/Word doc with project overview for ISSO          |
+| UI-015     | 🟡  | Subtitle text illegible on dark bg      | 2026-01-15 | Brighter colors + text-shadow for gray-400/500                |
+| UI-014     | 🟢  | Add condensed display density           | 2026-01-15 | Added "Condensed" option with 9-15px fonts                    |
+| UI-013     | 🟡  | Display density system                  | 2026-01-15 | CSS variables for 4 density levels + toggle + prefs           |
+| STIG-05    | 🟠  | SSH credentials need sudo support       | 2026-01-15 | Added sudo fields to SSH credentials (method/user/pw)         |
+| STIG-04    | 🟠  | SSH credentials management UI           | 2026-01-15 | Created CredentialsPage with CRUD for SSH creds               |
+| APP-015    | 🟠  | Settings Preferences nav link           | 2026-01-15 | Added Preferences to Settings sidebar navigation              |
+| SEC-008    | 🟡  | NATS auth/TLS disabled                  | 2026-01-14 | Created nats.prod.conf, cert gen script, updated docs         |
+| SEC-009    | 🟢  | trustProxy always true                  | 2026-01-14 | Made configurable via TRUST_PROXY env var                     |
+| SEC-006    | 🟠  | .env tracked with secrets               | 2026-01-14 | Already in .gitignore, .env.example exists                    |
+| SEC-007    | 🟠  | DB/Cache ports exposed                  | 2026-01-14 | Bound Postgres/Redis/NATS to 127.0.0.1                        |
+| APP-012    | 🔴  | Preflight CRLF errors on Windows        | 2026-01-14 | Converted to LF, added PowerShell wrapper                     |
+| APP-013    | 🔴  | Preflight Docker checks fail            | 2026-01-14 | Created preflight.ps1 for native Windows                      |
+| APP-014    | 🟠  | OpenAPI endpoint mismatch               | 2026-01-14 | Fixed endpoint to `/docs/json`                                |
 
 ---
 
