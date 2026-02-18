@@ -76,10 +76,9 @@ services:
       - ./infrastructure/coredns/Corefile:/etc/coredns/Corefile:ro
       - ./infrastructure/coredns/hosts.local:/etc/coredns/hosts.local:ro
     # No host ports — Windows blocks 5353 (mDNS reserved). DNS is internal only.
-    # To test: docker exec gridwatch-gateway nslookup arista.local.gridwatch 172.30.0.2
-    healthcheck:
-      <<: *healthcheck-defaults
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/health"]
+    # To test: docker exec gridwatch-gateway nslookup postgres.local.gridwatch 172.30.0.17
+    # No healthcheck — coredns/coredns:1.11.3 is a scratch image (no wget/curl/nc/shell).
+    # Container is healthy if it starts and DNS queries resolve (verified in logs).
     logging: *default-logging
     networks:
       gridwatch-network:
@@ -318,7 +317,7 @@ services:
       auth-service:
         condition: service_healthy
       coredns:
-        condition: service_healthy
+        condition: service_started
     # Use CoreDNS for local hostname resolution (.local.gridwatch zone)
     dns:
       - 172.30.0.17
@@ -472,7 +471,7 @@ services:
       nats:
         condition: service_healthy
       coredns:
-        condition: service_healthy
+        condition: service_started
     # Use CoreDNS for local hostname resolution during network scans
     dns:
       - 172.30.0.17
