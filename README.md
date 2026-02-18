@@ -68,6 +68,13 @@ cp .env.example .env
 npm install
 poetry install
 
+# Build shared TypeScript packages (required before starting containers)
+# The web-ui and auth-service dev containers volume-mount these from the host.
+# Without this step they will fail with MODULE_NOT_FOUND on startup.
+npm run build -w packages/shared-types
+npm run build -w packages/shared-auth
+npm run build -w packages/shared-ui
+
 # Build and start
 docker compose build
 docker compose --profile ipam --profile npm --profile stig up -d
