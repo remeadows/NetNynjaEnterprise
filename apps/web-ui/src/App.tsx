@@ -21,7 +21,6 @@ import { NPMDevicesPage } from "./modules/npm/pages/DevicesPage";
 import { NPMDeviceDetailPage } from "./modules/npm/pages/DeviceDetailPage";
 import { NPMAlertsPage } from "./modules/npm/pages/AlertsPage";
 import { SNMPv3CredentialsPage } from "./modules/npm/pages/SNMPv3CredentialsPage";
-import { NPMDiscoveryPage } from "./modules/npm/pages/DiscoveryPage";
 import { DeviceGroupsPage } from "./modules/npm/pages/DeviceGroupsPage";
 
 // STIG module
@@ -93,7 +92,6 @@ function App() {
             <Route index element={<Navigate to="/npm/devices" replace />} />
             <Route path="devices" element={<NPMDevicesPage />} />
             <Route path="devices/:id" element={<NPMDeviceDetailPage />} />
-            <Route path="discovery" element={<NPMDiscoveryPage />} />
             <Route path="alerts" element={<NPMAlertsPage />} />
             <Route path="credentials" element={<SNMPv3CredentialsPage />} />
             <Route path="groups" element={<DeviceGroupsPage />} />

@@ -337,7 +337,7 @@ export function UsersPage() {
 
       {/* Create User Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Add New User</CardTitle>
@@ -424,7 +424,7 @@ export function UsersPage() {
 
       {/* Edit User Modal */}
       {isEditModalOpen && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Edit User: {selectedUser.username}</CardTitle>
@@ -494,7 +494,7 @@ export function UsersPage() {
 
       {/* Reset Password Modal */}
       {isResetPasswordModalOpen && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Reset Password: {selectedUser.username}</CardTitle>

@@ -361,7 +361,7 @@ export function SNMPv3CredentialsPage() {
 
       {/* Create Credential Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle>Add SNMPv3 Credential</CardTitle>
@@ -538,7 +538,7 @@ export function SNMPv3CredentialsPage() {
 
       {/* Edit Credential Modal */}
       {isEditModalOpen && selectedCredential && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle>Edit Credential: {selectedCredential.name}</CardTitle>
@@ -688,7 +688,7 @@ export function SNMPv3CredentialsPage() {
 
       {/* Test Credential Modal */}
       {isTestModalOpen && selectedCredential && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Test Credential: {selectedCredential.name}</CardTitle>

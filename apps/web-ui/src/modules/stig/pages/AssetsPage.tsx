@@ -11,7 +11,11 @@ import {
 } from "@gridwatch/shared-ui";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Target } from "@gridwatch/shared-types";
-import { useSTIGStore, type TargetDefinition, type AuditGroup } from "../../../stores/stig";
+import {
+  useSTIGStore,
+  type TargetDefinition,
+  type AuditGroup,
+} from "../../../stores/stig";
 import { api } from "../../../lib/api";
 
 // Extended Target type to include credential info from API
@@ -152,8 +156,8 @@ export function STIGAssetsPage() {
   const [editTab, setEditTab] = useState<EditTab>("general");
   const [configFile, setConfigFile] = useState<File | null>(null);
   const [configAnalysisResults, setConfigAnalysisResults] = useState<{
-    jobIds: string[];  // All job IDs from multi-STIG analysis
-    jobId: string;     // Last job ID (for backwards compatibility)
+    jobIds: string[]; // All job IDs from multi-STIG analysis
+    jobId: string; // Last job ID (for backwards compatibility)
     totalChecks: number;
     passed: number;
     failed: number;
@@ -220,9 +224,12 @@ export function STIGAssetsPage() {
         benchmarkPlatform.includes(platformLower) ||
         platformLower.includes(benchmarkPlatform) ||
         // Handle common mappings
-        (platformLower === "juniper_srx" && benchmarkPlatform.includes("juniper")) ||
-        (platformLower === "juniper_junos" && benchmarkPlatform.includes("juniper")) ||
-        (platformLower === "cisco_ios" && benchmarkPlatform.includes("cisco")) ||
+        (platformLower === "juniper_srx" &&
+          benchmarkPlatform.includes("juniper")) ||
+        (platformLower === "juniper_junos" &&
+          benchmarkPlatform.includes("juniper")) ||
+        (platformLower === "cisco_ios" &&
+          benchmarkPlatform.includes("cisco")) ||
         (platformLower === "redhat" && benchmarkPlatform.includes("rhel")) ||
         (platformLower === "linux" && benchmarkPlatform.includes("linux"))
       );
@@ -325,7 +332,8 @@ export function STIGAssetsPage() {
         `Audit started successfully!\n\nJob ID: ${auditJob.id}\nStatus: ${auditJob.status}`,
       );
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to start audit";
+      const message =
+        err instanceof Error ? err.message : "Failed to start audit";
       alert(`Error starting audit: ${message}`);
     }
   };
@@ -372,11 +380,15 @@ export function STIGAssetsPage() {
 
     // Use assigned STIGs if available, otherwise use selected benchmark
     const enabledDefinitions = targetDefinitions.filter((td) => td.enabled);
-    const definitionsToAnalyze = enabledDefinitions.length > 0
-      ? enabledDefinitions.map((td) => ({ id: td.definitionId, title: td.stigTitle }))
-      : selectedBenchmarkId
-        ? [{ id: selectedBenchmarkId, title: "Selected Benchmark" }]
-        : [];
+    const definitionsToAnalyze =
+      enabledDefinitions.length > 0
+        ? enabledDefinitions.map((td) => ({
+            id: td.definitionId,
+            title: td.stigTitle,
+          }))
+        : selectedBenchmarkId
+          ? [{ id: selectedBenchmarkId, title: "Selected Benchmark" }]
+          : [];
 
     if (definitionsToAnalyze.length === 0) return;
 
@@ -395,7 +407,11 @@ export function STIGAssetsPage() {
       for (const def of definitionsToAnalyze) {
         const formData = new FormData();
         // Create a new Blob from the content for each request
-        formData.append("config_file", new Blob([fileContent]), configFile.name);
+        formData.append(
+          "config_file",
+          new Blob([fileContent]),
+          configFile.name,
+        );
         formData.append("definition_id", def.id);
 
         const response = await api.post(
@@ -417,9 +433,8 @@ export function STIGAssetsPage() {
 
       // Calculate overall compliance score
       const applicableChecks = totalPassed + totalFailed;
-      const overallScore = applicableChecks > 0
-        ? (totalPassed / applicableChecks) * 100
-        : 0;
+      const overallScore =
+        applicableChecks > 0 ? (totalPassed / applicableChecks) * 100 : 0;
 
       setConfigAnalysisResults({
         jobIds: allJobIds,
@@ -479,7 +494,8 @@ export function STIGAssetsPage() {
   // STIG-13: Handle removing assignment
   const handleRemoveAssignment = async (assignment: TargetDefinition) => {
     if (!selectedAsset) return;
-    if (!window.confirm(`Remove "${assignment.stigTitle}" from this asset?`)) return;
+    if (!window.confirm(`Remove "${assignment.stigTitle}" from this asset?`))
+      return;
     try {
       await removeAssignment(selectedAsset.id, assignment.id);
     } catch {
@@ -504,14 +520,17 @@ export function STIGAssetsPage() {
     if (!selectedAsset) return;
     const enabledDefinitions = targetDefinitions.filter((td) => td.enabled);
     if (enabledDefinitions.length === 0) {
-      alert("No enabled STIG definitions to audit. Please assign STIGs to this asset first.");
+      alert(
+        "No enabled STIG definitions to audit. Please assign STIGs to this asset first.",
+      );
       return;
     }
     try {
       const result = await startAuditAll(selectedAsset.id);
       setAuditAllResult(result);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to start audits";
+      const message =
+        err instanceof Error ? err.message : "Failed to start audits";
       alert(`Error: ${message}`);
     }
   };
@@ -675,7 +694,7 @@ export function STIGAssetsPage() {
 
       {/* Add Asset Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <CardContent className="pt-6">
               <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
@@ -759,7 +778,7 @@ export function STIGAssetsPage() {
 
       {/* Edit Asset Modal (Tabbed) */}
       {showEditModal && selectedAsset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <CardContent className="pt-6">
               <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
@@ -816,7 +835,10 @@ export function STIGAssetsPage() {
                     label="IP Address"
                     value={editTarget.ipAddress}
                     onChange={(e) =>
-                      setEditTarget({ ...editTarget, ipAddress: e.target.value })
+                      setEditTarget({
+                        ...editTarget,
+                        ipAddress: e.target.value,
+                      })
                     }
                     placeholder="e.g., 192.168.1.100"
                     required
@@ -949,18 +971,27 @@ export function STIGAssetsPage() {
                         Suggested STIGs for {selectedAsset.platform}:
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {getCompatibleBenchmarks(selectedAsset.platform).slice(0, 5).map((b) => (
-                          <button
-                            key={b.id}
-                            onClick={() => handleAddSTIG(b.id, targetDefinitions.length === 0)}
-                            className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 hover:bg-blue-200 dark:bg-blue-800 dark:text-blue-300 dark:hover:bg-blue-700"
-                          >
-                            + {b.title}
-                          </button>
-                        ))}
-                        {getCompatibleBenchmarks(selectedAsset.platform).length === 0 && (
+                        {getCompatibleBenchmarks(selectedAsset.platform)
+                          .slice(0, 5)
+                          .map((b) => (
+                            <button
+                              key={b.id}
+                              onClick={() =>
+                                handleAddSTIG(
+                                  b.id,
+                                  targetDefinitions.length === 0,
+                                )
+                              }
+                              className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 hover:bg-blue-200 dark:bg-blue-800 dark:text-blue-300 dark:hover:bg-blue-700"
+                            >
+                              + {b.title}
+                            </button>
+                          ))}
+                        {getCompatibleBenchmarks(selectedAsset.platform)
+                          .length === 0 && (
                           <span className="text-sm text-blue-600 dark:text-blue-400">
-                            No matching STIGs found. Upload STIGs in the Library.
+                            No matching STIGs found. Upload STIGs in the
+                            Library.
                           </span>
                         )}
                       </div>
@@ -997,7 +1028,10 @@ export function STIGAssetsPage() {
                                 {assignment.stigTitle || "Unknown STIG"}
                               </span>
                               {assignment.isPrimary && (
-                                <Badge variant="default" className="bg-yellow-500 text-white">
+                                <Badge
+                                  variant="default"
+                                  className="bg-yellow-500 text-white"
+                                >
                                   Primary
                                 </Badge>
                               )}
@@ -1007,13 +1041,33 @@ export function STIGAssetsPage() {
                             </div>
                             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                               {assignment.rulesCount || 0} rules
-                              {assignment.complianceScore !== null && assignment.complianceScore !== undefined && (
-                                <> | <span className={assignment.complianceScore >= 80 ? "text-green-600" : assignment.complianceScore >= 50 ? "text-yellow-600" : "text-red-600"}>
-                                  {assignment.complianceScore.toFixed(1)}% compliant
-                                </span></>
-                              )}
+                              {assignment.complianceScore !== null &&
+                                assignment.complianceScore !== undefined && (
+                                  <>
+                                    {" "}
+                                    |{" "}
+                                    <span
+                                      className={
+                                        assignment.complianceScore >= 80
+                                          ? "text-green-600"
+                                          : assignment.complianceScore >= 50
+                                            ? "text-yellow-600"
+                                            : "text-red-600"
+                                      }
+                                    >
+                                      {assignment.complianceScore.toFixed(1)}%
+                                      compliant
+                                    </span>
+                                  </>
+                                )}
                               {assignment.lastAuditDate && (
-                                <> | Last audit: {new Date(assignment.lastAuditDate).toLocaleDateString()}</>
+                                <>
+                                  {" "}
+                                  | Last audit:{" "}
+                                  {new Date(
+                                    assignment.lastAuditDate,
+                                  ).toLocaleDateString()}
+                                </>
                               )}
                             </p>
                           </div>
@@ -1025,10 +1079,26 @@ export function STIGAssetsPage() {
                                   ? "text-yellow-500"
                                   : "text-gray-400 hover:text-yellow-500"
                               }`}
-                              title={assignment.isPrimary ? "Primary STIG" : "Set as primary"}
+                              title={
+                                assignment.isPrimary
+                                  ? "Primary STIG"
+                                  : "Set as primary"
+                              }
                             >
-                              <svg className="h-5 w-5" fill={assignment.isPrimary ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                              <svg
+                                className="h-5 w-5"
+                                fill={
+                                  assignment.isPrimary ? "currentColor" : "none"
+                                }
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                                />
                               </svg>
                             </button>
                             <button
@@ -1036,8 +1106,18 @@ export function STIGAssetsPage() {
                               className="p-1 text-gray-400 hover:text-red-500"
                               title="Remove STIG"
                             >
-                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              <svg
+                                className="h-5 w-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
                               </svg>
                             </button>
                           </div>
@@ -1048,7 +1128,8 @@ export function STIGAssetsPage() {
 
                   {targetDefinitions.length === 0 && (
                     <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-8">
-                      No STIGs assigned. Click "Add STIG" to assign compliance benchmarks.
+                      No STIGs assigned. Click "Add STIG" to assign compliance
+                      benchmarks.
                     </p>
                   )}
 
@@ -1088,11 +1169,21 @@ export function STIGAssetsPage() {
                   </h3>
                   <div className="space-y-2">
                     {getCompatibleBenchmarks(selectedAsset.platform)
-                      .filter((b) => !targetDefinitions.some((td) => td.definitionId === b.id))
+                      .filter(
+                        (b) =>
+                          !targetDefinitions.some(
+                            (td) => td.definitionId === b.id,
+                          ),
+                      )
                       .map((benchmark) => (
                         <button
                           key={benchmark.id}
-                          onClick={() => handleAddSTIG(benchmark.id, targetDefinitions.length === 0)}
+                          onClick={() =>
+                            handleAddSTIG(
+                              benchmark.id,
+                              targetDefinitions.length === 0,
+                            )
+                          }
                           className="w-full rounded-lg border border-gray-200 p-3 text-left hover:border-blue-500 hover:bg-blue-50 dark:border-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20"
                         >
                           <p className="font-medium text-gray-900 dark:text-white">
@@ -1116,7 +1207,12 @@ export function STIGAssetsPage() {
                   {getUnassignedBenchmarks().map((benchmark) => (
                     <button
                       key={benchmark.id}
-                      onClick={() => handleAddSTIG(benchmark.id, targetDefinitions.length === 0)}
+                      onClick={() =>
+                        handleAddSTIG(
+                          benchmark.id,
+                          targetDefinitions.length === 0,
+                        )
+                      }
                       className="w-full rounded-lg border border-gray-200 p-3 text-left hover:border-blue-500 hover:bg-blue-50 dark:border-gray-700 dark:hover:border-blue-500 dark:hover:bg-blue-900/20"
                     >
                       <p className="font-medium text-gray-900 dark:text-white">
@@ -1151,7 +1247,7 @@ export function STIGAssetsPage() {
 
       {/* Audit All Modal */}
       {showAuditAllModal && selectedAsset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-lg max-h-[80vh] overflow-y-auto">
             <CardContent className="pt-6">
               <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
@@ -1171,7 +1267,8 @@ export function STIGAssetsPage() {
                 <>
                   <div className="mb-4">
                     <h3 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Enabled STIGs to Audit ({targetDefinitions.filter((td) => td.enabled).length})
+                      Enabled STIGs to Audit (
+                      {targetDefinitions.filter((td) => td.enabled).length})
                     </h3>
                     <div className="space-y-2">
                       {targetDefinitions
@@ -1189,9 +1286,11 @@ export function STIGAssetsPage() {
                             </span>
                           </div>
                         ))}
-                      {targetDefinitions.filter((td) => td.enabled).length === 0 && (
+                      {targetDefinitions.filter((td) => td.enabled).length ===
+                        0 && (
                         <p className="py-4 text-center text-sm text-gray-500">
-                          No enabled STIGs assigned. Edit the asset to add STIGs.
+                          No enabled STIGs assigned. Edit the asset to add
+                          STIGs.
                         </p>
                       )}
                     </div>
@@ -1210,7 +1309,10 @@ export function STIGAssetsPage() {
                     </Button>
                     <Button
                       onClick={handleStartAuditAll}
-                      disabled={targetDefinitions.filter((td) => td.enabled).length === 0}
+                      disabled={
+                        targetDefinitions.filter((td) => td.enabled).length ===
+                        0
+                      }
                       loading={isLoading}
                       className="bg-indigo-600 text-white hover:bg-indigo-700"
                     >
@@ -1251,8 +1353,8 @@ export function STIGAssetsPage() {
                                 job.status === "completed"
                                   ? "default"
                                   : job.status === "running"
-                                  ? "secondary"
-                                  : "outline"
+                                    ? "secondary"
+                                    : "outline"
                               }
                             >
                               {job.status}
@@ -1284,7 +1386,7 @@ export function STIGAssetsPage() {
 
       {/* Single Audit Modal - Select Benchmark */}
       {showAuditModal && selectedAsset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-md">
             <CardContent className="pt-6">
               <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
@@ -1364,7 +1466,7 @@ export function STIGAssetsPage() {
 
       {/* Config Analysis Modal */}
       {showConfigModal && selectedAsset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <CardContent className="pt-6">
               <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
@@ -1386,10 +1488,11 @@ export function STIGAssetsPage() {
                 <div className="rounded-lg border border-purple-200 bg-purple-50 p-4 dark:border-purple-700 dark:bg-purple-900/20">
                   <p className="text-sm text-purple-700 dark:text-purple-300">
                     Upload a device configuration file (.txt, .xml, .conf, .cfg)
-                    to analyze it against {targetDefinitions.filter((td) => td.enabled).length > 0
+                    to analyze it against{" "}
+                    {targetDefinitions.filter((td) => td.enabled).length > 0
                       ? "the assigned STIGs"
-                      : "the selected STIG benchmark"}. This does
-                    not require a live connection to the device.
+                      : "the selected STIG benchmark"}
+                    . This does not require a live connection to the device.
                   </p>
                 </div>
 
@@ -1404,16 +1507,26 @@ export function STIGAssetsPage() {
                         {targetDefinitions
                           .filter((td) => td.enabled)
                           .map((td) => (
-                            <div key={td.id} className="flex items-center gap-2 text-sm">
-                              <span className="text-green-600 dark:text-green-400">✓</span>
-                              <span className="text-gray-700 dark:text-gray-300">{td.stigTitle}</span>
-                              <span className="text-xs text-gray-500">({td.rulesCount} rules)</span>
+                            <div
+                              key={td.id}
+                              className="flex items-center gap-2 text-sm"
+                            >
+                              <span className="text-green-600 dark:text-green-400">
+                                ✓
+                              </span>
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {td.stigTitle}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                ({td.rulesCount} rules)
+                              </span>
                             </div>
                           ))}
                       </div>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      The configuration will be analyzed against all enabled STIGs listed above.
+                      The configuration will be analyzed against all enabled
+                      STIGs listed above.
                     </p>
                   </div>
                 ) : benchmarkOptions.length > 0 ? (
@@ -1498,37 +1611,57 @@ export function STIGAssetsPage() {
                           onClick={async () => {
                             try {
                               // Use combined report endpoint if multiple jobs
-                              const jobIds = configAnalysisResults.jobIds || [configAnalysisResults.jobId];
-                              const endpoint = jobIds.length > 1
-                                ? `/api/v1/stig/reports/combined-pdf?job_ids=${jobIds.join(',')}`
-                                : `/api/v1/stig/reports/download/${configAnalysisResults.jobId}?format=pdf`;
+                              const jobIds = configAnalysisResults.jobIds || [
+                                configAnalysisResults.jobId,
+                              ];
+                              const endpoint =
+                                jobIds.length > 1
+                                  ? `/api/v1/stig/reports/combined-pdf?job_ids=${jobIds.join(",")}`
+                                  : `/api/v1/stig/reports/download/${configAnalysisResults.jobId}?format=pdf`;
 
-                              const response = await api.get(endpoint, { responseType: 'blob' });
-                              if (response.data.type === 'application/json') {
+                              const response = await api.get(endpoint, {
+                                responseType: "blob",
+                              });
+                              if (response.data.type === "application/json") {
                                 const text = await response.data.text();
                                 const errorData = JSON.parse(text);
-                                throw new Error(errorData.error?.message || 'Download failed');
+                                throw new Error(
+                                  errorData.error?.message || "Download failed",
+                                );
                               }
-                              const url = window.URL.createObjectURL(new Blob([response.data]));
-                              const link = document.createElement('a');
+                              const url = window.URL.createObjectURL(
+                                new Blob([response.data]),
+                              );
+                              const link = document.createElement("a");
                               link.href = url;
-                              const filename = jobIds.length > 1
-                                ? `Combined_STIG_Report.pdf`
-                                : `STIG_Report_${configAnalysisResults.jobId}.pdf`;
-                              link.setAttribute('download', filename);
+                              const filename =
+                                jobIds.length > 1
+                                  ? `Combined_STIG_Report.pdf`
+                                  : `STIG_Report_${configAnalysisResults.jobId}.pdf`;
+                              link.setAttribute("download", filename);
                               document.body.appendChild(link);
                               link.click();
                               link.remove();
                               window.URL.revokeObjectURL(url);
                             } catch (error: unknown) {
-                              let message = 'Download failed';
-                              if (error && typeof error === 'object' && 'response' in error) {
-                                const axiosError = error as { response?: { status?: number; data?: Blob } };
+                              let message = "Download failed";
+                              if (
+                                error &&
+                                typeof error === "object" &&
+                                "response" in error
+                              ) {
+                                const axiosError = error as {
+                                  response?: { status?: number; data?: Blob };
+                                };
                                 if (axiosError.response?.data instanceof Blob) {
                                   try {
-                                    const text = await axiosError.response.data.text();
+                                    const text =
+                                      await axiosError.response.data.text();
                                     const errorData = JSON.parse(text);
-                                    message = errorData.error?.message || errorData.detail || `Request failed with status code ${axiosError.response?.status}`;
+                                    message =
+                                      errorData.error?.message ||
+                                      errorData.detail ||
+                                      `Request failed with status code ${axiosError.response?.status}`;
                                   } catch {
                                     message = `Request failed with status code ${axiosError.response?.status}`;
                                   }
@@ -1541,8 +1674,18 @@ export function STIGAssetsPage() {
                           }}
                           className="bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
                         >
-                          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          <svg
+                            className="mr-2 h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
                           </svg>
                           Download PDF
                         </Button>
@@ -1551,37 +1694,57 @@ export function STIGAssetsPage() {
                           onClick={async () => {
                             try {
                               // Use combined CKL (ZIP) endpoint if multiple jobs
-                              const jobIds = configAnalysisResults.jobIds || [configAnalysisResults.jobId];
-                              const endpoint = jobIds.length > 1
-                                ? `/api/v1/stig/reports/combined-ckl?job_ids=${jobIds.join(',')}`
-                                : `/api/v1/stig/reports/download/${configAnalysisResults.jobId}?format=ckl`;
+                              const jobIds = configAnalysisResults.jobIds || [
+                                configAnalysisResults.jobId,
+                              ];
+                              const endpoint =
+                                jobIds.length > 1
+                                  ? `/api/v1/stig/reports/combined-ckl?job_ids=${jobIds.join(",")}`
+                                  : `/api/v1/stig/reports/download/${configAnalysisResults.jobId}?format=ckl`;
 
-                              const response = await api.get(endpoint, { responseType: 'blob' });
-                              if (response.data.type === 'application/json') {
+                              const response = await api.get(endpoint, {
+                                responseType: "blob",
+                              });
+                              if (response.data.type === "application/json") {
                                 const text = await response.data.text();
                                 const errorData = JSON.parse(text);
-                                throw new Error(errorData.error?.message || 'Download failed');
+                                throw new Error(
+                                  errorData.error?.message || "Download failed",
+                                );
                               }
-                              const url = window.URL.createObjectURL(new Blob([response.data]));
-                              const link = document.createElement('a');
+                              const url = window.URL.createObjectURL(
+                                new Blob([response.data]),
+                              );
+                              const link = document.createElement("a");
                               link.href = url;
-                              const filename = jobIds.length > 1
-                                ? `STIG_Checklists.zip`
-                                : `STIG_Report_${configAnalysisResults.jobId}.ckl`;
-                              link.setAttribute('download', filename);
+                              const filename =
+                                jobIds.length > 1
+                                  ? `STIG_Checklists.zip`
+                                  : `STIG_Report_${configAnalysisResults.jobId}.ckl`;
+                              link.setAttribute("download", filename);
                               document.body.appendChild(link);
                               link.click();
                               link.remove();
                               window.URL.revokeObjectURL(url);
                             } catch (error: unknown) {
-                              let message = 'Download failed';
-                              if (error && typeof error === 'object' && 'response' in error) {
-                                const axiosError = error as { response?: { status?: number; data?: Blob } };
+                              let message = "Download failed";
+                              if (
+                                error &&
+                                typeof error === "object" &&
+                                "response" in error
+                              ) {
+                                const axiosError = error as {
+                                  response?: { status?: number; data?: Blob };
+                                };
                                 if (axiosError.response?.data instanceof Blob) {
                                   try {
-                                    const text = await axiosError.response.data.text();
+                                    const text =
+                                      await axiosError.response.data.text();
                                     const errorData = JSON.parse(text);
-                                    message = errorData.error?.message || errorData.detail || `Request failed with status code ${axiosError.response?.status}`;
+                                    message =
+                                      errorData.error?.message ||
+                                      errorData.detail ||
+                                      `Request failed with status code ${axiosError.response?.status}`;
                                   } catch {
                                     message = `Request failed with status code ${axiosError.response?.status}`;
                                   }
@@ -1594,8 +1757,18 @@ export function STIGAssetsPage() {
                           }}
                           className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
                         >
-                          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          <svg
+                            className="mr-2 h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
                           </svg>
                           Download CKL
                         </Button>
@@ -1621,7 +1794,9 @@ export function STIGAssetsPage() {
                   <Button
                     onClick={handleAnalyzeConfig}
                     disabled={
-                      (!selectedBenchmarkId && targetDefinitions.filter((td) => td.enabled).length === 0) ||
+                      (!selectedBenchmarkId &&
+                        targetDefinitions.filter((td) => td.enabled).length ===
+                          0) ||
                       !configFile ||
                       isAnalyzing
                     }

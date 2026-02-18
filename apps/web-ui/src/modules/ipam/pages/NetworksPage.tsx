@@ -373,7 +373,7 @@ export function IPAMNetworksPage() {
 
       {/* Add Network Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Add Network</CardTitle>
@@ -474,7 +474,7 @@ export function IPAMNetworksPage() {
 
       {/* Scans Modal */}
       {showScansModal && selectedNetworkScans && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden">
             <CardHeader>
               <CardTitle>

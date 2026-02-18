@@ -388,7 +388,7 @@ export function STIGAuditProgressPage() {
 
       {/* Detail Modal */}
       {showDetailModal && selectedGroup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <CardContent className="pt-6">
               <div className="flex items-start justify-between">

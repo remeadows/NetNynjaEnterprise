@@ -534,8 +534,8 @@ export function STIGLibraryPage() {
 
       {/* Upload Modal */}
       {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+        <div className="modal-overlay">
+          <div className="modal-card w-full max-w-lg rounded-lg p-6">
             <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               Upload STIG File
             </h3>
@@ -630,7 +630,7 @@ export function STIGLibraryPage() {
 
       {/* Rules Modal */}
       {showRulesModal && selectedBenchmark && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <div className="w-full max-w-4xl max-h-[80vh] overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-800">
             <div className="border-b border-gray-200 p-4 dark:border-gray-700">
               <div className="flex items-center justify-between">
@@ -684,8 +684,8 @@ export function STIGLibraryPage() {
 
       {/* Import Checklist Modal */}
       {showImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+        <div className="modal-overlay">
+          <div className="modal-card w-full max-w-lg rounded-lg p-6">
             <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               Import Checklist
             </h3>
@@ -792,8 +792,8 @@ export function STIGLibraryPage() {
 
       {/* Delete Confirmation */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+        <div className="modal-overlay">
+          <div className="modal-card w-full max-w-md rounded-lg p-6">
             <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               Delete STIG
             </h3>

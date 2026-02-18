@@ -33,7 +33,7 @@ export const useThemeStore = create<ThemeState>()(
       isDark: false,
       activeModule: "ipam",
       sidebarCollapsed: false,
-      displayDensity: "default",
+      displayDensity: "compact",
 
       toggleTheme: () => {
         set((state) => ({ isDark: !state.isDark }));

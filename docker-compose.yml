@@ -66,6 +66,27 @@ services:
     networks:
       - gridwatch-network
 
+  coredns:
+    image: coredns/coredns:1.11.3
+    profiles: ["infra", "ipam", "npm", "stig", "syslog"]
+    container_name: gridwatch-coredns
+    restart: unless-stopped
+    command: -conf /etc/coredns/Corefile
+    volumes:
+      - ./infrastructure/coredns/Corefile:/etc/coredns/Corefile:ro
+      - ./infrastructure/coredns/hosts.local:/etc/coredns/hosts.local:ro
+    ports:
+      # Expose DNS on localhost for host-level resolution testing
+      - "127.0.0.1:5353:53/udp"
+      - "127.0.0.1:5353:53/tcp"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/health"]
+    logging: *default-logging
+    networks:
+      gridwatch-network:
+        ipv4_address: 172.30.0.2
+
   nats:
     image: nats:2.10-alpine
     profiles: ["infra", "ipam", "npm", "stig", "syslog"]
@@ -298,6 +319,11 @@ services:
         condition: service_healthy
       auth-service:
         condition: service_healthy
+      coredns:
+        condition: service_healthy
+    # Use CoreDNS for local hostname resolution (.local.gridwatch zone)
+    dns:
+      - 172.30.0.2
     healthcheck:
       <<: *healthcheck-defaults
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3001/healthz"]
@@ -447,6 +473,11 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
+      coredns:
+        condition: service_healthy
+    # Use CoreDNS for local hostname resolution during network scans
+    dns:
+      - 172.30.0.2
     # SEC-021: Minimum capabilities — NET_RAW for ICMP ping/nmap (NET_ADMIN removed)
     cap_drop:
       - ALL

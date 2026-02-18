@@ -245,26 +245,6 @@ const moduleNav: Record<ModuleType, NavItem[]> = {
       ),
     },
     {
-      id: "discovery",
-      label: "Discovery",
-      href: "/npm/discovery",
-      icon: (
-        <svg
-          className="h-5 w-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
-      ),
-    },
-    {
       id: "alerts",
       label: "Alerts",
       href: "/npm/alerts",
@@ -644,14 +624,8 @@ export function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
-  const {
-    activeModule,
-    sidebarCollapsed,
-    displayDensity,
-    setActiveModule,
-    toggleSidebar,
-    cycleDensity,
-  } = useThemeStore();
+  const { activeModule, sidebarCollapsed, setActiveModule, toggleSidebar } =
+    useThemeStore();
 
   const handleModuleChange = (module: ModuleType) => {
     setActiveModule(module);
@@ -664,20 +638,46 @@ export function MainLayout() {
   };
 
   return (
-    <div
-      className={`relative flex h-screen overflow-hidden bg-dark-900 density-${displayDensity}`}
-    >
-      {/* Full-page ninja background image */}
+    <div className="relative flex h-screen overflow-hidden bg-dark-900 density-compact">
+      {/* Professional dark cyberpunk background — circuit grid pattern */}
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        className="absolute inset-0"
+        style={{ backgroundColor: "#080c14" }}
+      />
+      {/* Subtle circuit/grid line overlay */}
+      <div
+        className="absolute inset-0"
         style={{
-          backgroundImage: "url(/assets/NetNNJA1.jpg)",
+          backgroundImage:
+            "linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
         }}
       />
-      {/* Dark overlay to fade the background image */}
-      <div className="absolute inset-0 bg-dark-900/92" />
-      {/* Subtle cyber glow effect */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary-900/10 via-transparent to-accent-900/10" />
+      {/* Faint diagonal accent lines for depth */}
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage:
+            "linear-gradient(135deg, rgba(0,212,255,0.04) 25%, transparent 25%, transparent 50%, rgba(0,212,255,0.04) 50%, rgba(0,212,255,0.04) 75%, transparent 75%)",
+          backgroundSize: "80px 80px",
+        }}
+      />
+      {/* Radial cyan glow — top-left corner accent */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 40% at 0% 0%, rgba(0,212,255,0.06) 0%, transparent 70%)",
+        }}
+      />
+      {/* Radial magenta glow — bottom-right corner accent */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse 50% 35% at 100% 100%, rgba(217,70,239,0.05) 0%, transparent 70%)",
+        }}
+      />
 
       <Sidebar
         module={activeModule}
@@ -689,13 +689,14 @@ export function MainLayout() {
         className="relative z-10"
         backgroundImage="/assets/GridWatchLogo.png"
         header={
-          !sidebarCollapsed && (
-            <div className="flex items-center gap-3">
-              <img
-                src="/assets/NetNNJA2.jpg"
-                alt="GridWatch Logo"
-                className="h-8 w-8 rounded-lg object-cover"
-              />
+          <div className="flex items-center gap-3">
+            <img
+              src="/assets/GridWatchLogo.png"
+              alt="GridWatch Logo"
+              className="h-8 w-8 rounded-lg object-cover flex-shrink-0"
+              style={{ filter: "drop-shadow(0 0 4px rgba(0,212,255,0.5))" }}
+            />
+            {!sidebarCollapsed && (
               <div className="flex flex-col leading-tight">
                 <span className="text-lg font-bold text-primary-500">
                   GridWatch
@@ -704,8 +705,8 @@ export function MainLayout() {
                   Enterprise
                 </span>
               </div>
-            </div>
-          )
+            )}
+          </div>
         }
       />
 
@@ -723,9 +724,7 @@ export function MainLayout() {
               : undefined
           }
           onLogout={handleLogout}
-          extraControls={
-            <DensityToggle density={displayDensity} onCycle={cycleDensity} />
-          }
+          extraControls={undefined}
         />
 
         <main className="flex-1 overflow-y-auto p-6">

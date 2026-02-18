@@ -379,7 +379,7 @@ export function NPMDiscoveryPage() {
 
       {/* New Discovery Modal */}
       {showNewDiscoveryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-md">
             <CardContent className="pt-6">
               <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
@@ -499,7 +499,7 @@ export function NPMDiscoveryPage() {
 
       {/* Results Modal */}
       {showResultsModal && selectedJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <CardContent className="pt-6 flex-1 overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
@@ -849,7 +849,7 @@ export function NPMDiscoveryPage() {
 
       {/* Assign Site Modal */}
       {showAssignSiteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Assign Site</CardTitle>

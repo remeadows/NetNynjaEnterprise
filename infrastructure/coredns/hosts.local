@@ -1,0 +1,24 @@
+# GridWatch local development host mappings
+# Format: <IP>  <hostname>
+# Add your lab hosts below. Containers and the gateway will resolve these
+# names via the CoreDNS service on the gridwatch-network.
+#
+# Docker service names (172.30.0.x static IPs are assigned in docker-compose.yml)
+# These are automatically resolvable by container name on the gridwatch-network,
+# but explicit entries allow short .local.gridwatch names for browser access.
+#
+172.30.0.10   postgres.local.gridwatch
+172.30.0.11   redis.local.gridwatch
+172.30.0.12   nats.local.gridwatch
+172.30.0.20   gateway.local.gridwatch
+172.30.0.30   grafana.local.gridwatch
+172.30.0.31   prometheus.local.gridwatch
+172.30.0.32   loki.local.gridwatch
+172.30.0.33   jaeger.local.gridwatch
+172.30.0.40   vault.local.gridwatch
+
+# Lab network hosts — add your real devices here
+# Example:
+# 192.168.1.1   router.local.gridwatch
+# 192.168.80.2  arista.local.gridwatch
+# 192.168.1.137 gridwatch-host.local.gridwatch

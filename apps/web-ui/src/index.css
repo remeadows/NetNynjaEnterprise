@@ -224,6 +224,104 @@
   .glow-green {
     box-shadow: 0 0 5px #22c55e, 0 0 20px rgba(34, 197, 94, 0.3);
   }
+
+  /* -----------------------------------------------------------------------
+     Modal system — fully opaque dark card with cyan accent border
+     Use .modal-overlay for the backdrop, .modal-card for the inner panel
+     ----------------------------------------------------------------------- */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(2px);
+  }
+
+  .modal-card {
+    background-color: #0d1117 !important;
+    border: 1px solid rgba(0, 212, 255, 0.25) !important;
+    box-shadow:
+      0 0 0 1px rgba(0, 212, 255, 0.08),
+      0 24px 48px rgba(0, 0, 0, 0.8),
+      0 8px 24px rgba(0, 0, 0, 0.6) !important;
+    color: #e2e8f0 !important;
+  }
+
+  /* Form inputs inside modals — ensure full opacity and contrast */
+  .modal-card input,
+  .modal-card textarea,
+  .modal-card select {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #f1f5f9 !important;
+  }
+
+  .modal-card input::placeholder,
+  .modal-card textarea::placeholder {
+    color: #64748b !important;
+  }
+
+  .modal-card input:focus,
+  .modal-card textarea:focus,
+  .modal-card select:focus {
+    border-color: #00d4ff !important;
+    box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.3) !important;
+  }
+
+  /* Labels inside modals */
+  .modal-card label {
+    color: #94a3b8 !important;
+  }
+
+  /* Headings and paragraphs inside modals */
+  .modal-card h1,
+  .modal-card h2,
+  .modal-card h3,
+  .modal-card h4,
+  .modal-card p {
+    color: #e2e8f0 !important;
+  }
+
+  /* Muted text inside modals */
+  .modal-card .text-gray-500,
+  .modal-card .text-gray-400,
+  .modal-card .text-silver-400 {
+    color: #64748b !important;
+  }
+
+  /* Selection list items inside modals (scan type checkboxes, etc.) */
+  .modal-card .border-gray-200,
+  .modal-card [class*="border-gray-200"] {
+    border-color: #334155 !important;
+  }
+
+  .modal-card [class*="hover:bg-gray-50"],
+  .modal-card [class*="dark:hover:bg-gray-700"] {
+    background-color: #1e293b !important;
+  }
+
+  /* Warning/info banners inside modals */
+  .modal-card .bg-amber-50,
+  .modal-card [class*="dark:bg-amber-900"] {
+    background-color: rgba(180, 83, 9, 0.15) !important;
+    border-color: rgba(251, 191, 36, 0.3) !important;
+  }
+
+  /* Standalone modal-input utility */
+  .modal-input {
+    background-color: #1e293b !important;
+    border: 1px solid #334155 !important;
+    color: #f1f5f9 !important;
+    outline: none;
+  }
+
+  .modal-input:focus {
+    border-color: #00d4ff !important;
+    box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.3) !important;
+  }
 }
 
 /* Custom scrollbar - dark cyberpunk style */

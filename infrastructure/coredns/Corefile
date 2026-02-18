@@ -1,0 +1,33 @@
+# CoreDNS configuration for GridWatch development environment
+# Resolves .local.gridwatch hostnames via hosts file
+# Forwards all other queries to upstream DNS (no external DNS needed)
+
+# Handle .local.gridwatch zone — resolve from hosts file
+local.gridwatch {
+    hosts /etc/coredns/hosts.local {
+        fallthrough
+    }
+    log
+    errors
+}
+
+# Handle reverse lookups for the gridwatch Docker network (172.30.x.x)
+30.172.in-addr.arpa {
+    hosts /etc/coredns/hosts.local {
+        fallthrough
+    }
+    errors
+}
+
+# Handle all other DNS queries — forward to host resolver or well-known public DNS
+# Uses 8.8.8.8 / 1.1.1.1 as fallback; containers only need to resolve external names
+# for image pulls during build — runtime traffic stays internal
+. {
+    forward . 8.8.8.8 1.1.1.1 {
+        max_concurrent 1000
+    }
+    cache 300
+    errors
+    health :8081
+    ready :8082
+}

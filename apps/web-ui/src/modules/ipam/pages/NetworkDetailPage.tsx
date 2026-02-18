@@ -415,7 +415,7 @@ export function IPAMNetworkDetailPage() {
   const totalCapacity = 254; // Assuming /24 for simplicity
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={() => navigate("/ipam/networks")}>
@@ -516,7 +516,7 @@ export function IPAMNetworkDetailPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatsCard
           title="Total Addresses"
           value={addresses.length}
@@ -550,73 +550,72 @@ export function IPAMNetworkDetailPage() {
 
       {/* Network Details */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Network Details</CardTitle>
-          <Button variant="ghost" size="sm" onClick={handleEditNetwork}>
-            <svg
-              className="mr-1 h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+        <CardContent className="py-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-silver-500">
+              Network Details
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleEditNetwork}
+              className="h-6 px-2 text-xs"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
-            </svg>
-            Edit
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <svg
+                className="mr-1 h-3 w-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
+              </svg>
+              Edit
+            </Button>
+          </div>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
             <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                Gateway
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-white">
-                {selectedNetwork?.gateway || "Not configured"}
+              <dt className="text-xs font-medium text-silver-500">Gateway</dt>
+              <dd className="text-sm text-silver-100">
+                {selectedNetwork?.gateway || "—"}
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                Site
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-white">
-                {selectedNetwork?.site || "Not specified"}
+              <dt className="text-xs font-medium text-silver-500">Site</dt>
+              <dd className="text-sm text-silver-100">
+                {selectedNetwork?.site || "—"}
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                Location
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-white">
-                {selectedNetwork?.location || "Not specified"}
+              <dt className="text-xs font-medium text-silver-500">Location</dt>
+              <dd className="text-sm text-silver-100">
+                {selectedNetwork?.location || "—"}
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                Status
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-white">
+              <dt className="text-xs font-medium text-silver-500">Status</dt>
+              <dd className="text-sm text-silver-100">
                 {selectedNetwork?.isActive ? "Active" : "Inactive"}
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <dt className="text-xs font-medium text-silver-500">
                 DNS Servers
               </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-white">
-                {selectedNetwork?.dnsServers?.join(", ") || "Not configured"}
+              <dd className="text-sm text-silver-100">
+                {selectedNetwork?.dnsServers?.join(", ") || "—"}
               </dd>
             </div>
-            <div className="sm:col-span-2 lg:col-span-3">
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            <div>
+              <dt className="text-xs font-medium text-silver-500">
                 Description
               </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-white">
-                {selectedNetwork?.description || "No description"}
+              <dd className="text-sm text-silver-100 truncate">
+                {selectedNetwork?.description || "—"}
               </dd>
             </div>
           </dl>
@@ -879,8 +878,8 @@ export function IPAMNetworkDetailPage() {
 
       {/* Scan Type Selection Modal */}
       {showScanModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+        <div className="modal-overlay">
+          <div className="modal-card w-full max-w-md rounded-lg p-6">
             <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               Start Network Scan
             </h3>
@@ -957,8 +956,8 @@ export function IPAMNetworkDetailPage() {
 
       {/* Add to NPM Modal */}
       {showAddToNpmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+        <div className="modal-overlay">
+          <div className="modal-card w-full max-w-lg rounded-lg p-6">
             <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               Add to NPM Monitoring
             </h3>
@@ -1049,7 +1048,7 @@ export function IPAMNetworkDetailPage() {
                       <select
                         value={npmSnmpCredentialId}
                         onChange={(e) => setNpmSnmpCredentialId(e.target.value)}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        className="modal-input w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
                       >
                         <option value="">Select a credential...</option>
                         {credentials.map((cred) => (
@@ -1077,7 +1076,7 @@ export function IPAMNetworkDetailPage() {
                       onChange={(e) =>
                         setNpmPollInterval(parseInt(e.target.value, 10))
                       }
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      className="modal-input w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
                     >
                       <option value={30}>30 seconds</option>
                       <option value={60}>1 minute</option>
@@ -1136,8 +1135,8 @@ export function IPAMNetworkDetailPage() {
 
       {/* Edit Scan Modal */}
       {showEditScanModal && editingScan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+        <div className="modal-overlay">
+          <div className="modal-card w-full max-w-md rounded-lg p-6">
             <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               Edit Scan
             </h3>
@@ -1153,7 +1152,7 @@ export function IPAMNetworkDetailPage() {
                     setEditingScan({ ...editingScan, name: e.target.value })
                   }
                   placeholder="Enter a name for this scan"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="modal-input w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
                 />
               </div>
               <div>
@@ -1167,7 +1166,7 @@ export function IPAMNetworkDetailPage() {
                   }
                   placeholder="Add notes about this scan..."
                   rows={4}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="modal-input w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
                 />
               </div>
             </div>
@@ -1191,8 +1190,8 @@ export function IPAMNetworkDetailPage() {
 
       {/* Edit Network Modal */}
       {showEditNetworkModal && editingNetwork && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+        <div className="modal-overlay">
+          <div className="modal-card w-full max-w-lg rounded-lg p-6">
             <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
               Edit Network
             </h3>
@@ -1211,7 +1210,7 @@ export function IPAMNetworkDetailPage() {
                     })
                   }
                   placeholder="Network name"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="modal-input w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1229,7 +1228,7 @@ export function IPAMNetworkDetailPage() {
                       })
                     }
                     placeholder="e.g., 192.168.1.1"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    className="modal-input w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1248,7 +1247,7 @@ export function IPAMNetworkDetailPage() {
                     placeholder="1-4094"
                     min="1"
                     max="4094"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    className="modal-input w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
                   />
                 </div>
               </div>
@@ -1267,7 +1266,7 @@ export function IPAMNetworkDetailPage() {
                       })
                     }
                     placeholder="Site name"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    className="modal-input w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1284,7 +1283,7 @@ export function IPAMNetworkDetailPage() {
                       })
                     }
                     placeholder="Physical location"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    className="modal-input w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
                   />
                 </div>
               </div>
@@ -1302,7 +1301,7 @@ export function IPAMNetworkDetailPage() {
                     })
                   }
                   placeholder="e.g., 8.8.8.8, 8.8.4.4"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="modal-input w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Comma-separated list of DNS server IPs
@@ -1322,7 +1321,7 @@ export function IPAMNetworkDetailPage() {
                   }
                   placeholder="Network description..."
                   rows={3}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="modal-input w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
                 />
               </div>
             </div>

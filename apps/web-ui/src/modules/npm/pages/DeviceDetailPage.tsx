@@ -762,7 +762,7 @@ export function NPMDeviceDetailPage() {
 
       {/* Poll Now Modal */}
       {showPollModal && selectedDevice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-md">
             <CardContent className="pt-6">
               <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
@@ -958,7 +958,7 @@ export function NPMDeviceDetailPage() {
 
       {/* Device Settings Modal */}
       {showSettingsModal && selectedDevice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <CardContent className="pt-6">
               <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">

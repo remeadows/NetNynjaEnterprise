@@ -10,30 +10,45 @@ export function AuthLayout() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-dark-900">
-      {/* Full-page ninja background image */}
+      {/* Professional dark cyberpunk background */}
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        className="absolute inset-0"
+        style={{ backgroundColor: "#080c14" }}
+      />
+      {/* Circuit grid */}
+      <div
+        className="absolute inset-0"
         style={{
-          backgroundImage: "url(/assets/NetNNJA1.jpg)",
+          backgroundImage:
+            "linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
         }}
       />
-      {/* Dark overlay to fade the background image */}
-      <div className="absolute inset-0 bg-dark-900/80" />
-
-      {/* Cyberpunk background effect */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-cyber-gradient opacity-60" />
-        <div className="absolute inset-0 bg-cyber-glow" />
-        {/* Grid overlay effect */}
-        <div
-          className="absolute inset-0 opacity-5"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(0, 212, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 212, 255, 0.1) 1px, transparent 1px)",
-            backgroundSize: "50px 50px",
-          }}
-        />
-      </div>
+      {/* Diagonal depth lines */}
+      <div
+        className="absolute inset-0 opacity-20"
+        style={{
+          backgroundImage:
+            "linear-gradient(135deg, rgba(0,212,255,0.05) 25%, transparent 25%, transparent 50%, rgba(0,212,255,0.05) 50%, rgba(0,212,255,0.05) 75%, transparent 75%)",
+          backgroundSize: "80px 80px",
+        }}
+      />
+      {/* Cyan glow — top centre */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,212,255,0.10) 0%, transparent 70%)",
+        }}
+      />
+      {/* Magenta glow — bottom centre */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 40% at 50% 110%, rgba(217,70,239,0.08) 0%, transparent 70%)",
+        }}
+      />
 
       <div className="relative z-10 w-full max-w-md p-8">
         <Outlet />

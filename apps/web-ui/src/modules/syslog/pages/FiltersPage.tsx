@@ -243,7 +243,7 @@ export function SyslogFiltersPage() {
 
       {/* Add Filter Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="modal-overlay">
           <Card className="w-full max-w-lg">
             <CardContent className="pt-6">
               <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">

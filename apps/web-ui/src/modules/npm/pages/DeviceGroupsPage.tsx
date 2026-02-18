@@ -248,8 +248,8 @@ export function DeviceGroupsPage() {
 
       {/* Create Group Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-lg border border-dark-700 bg-dark-800 p-6 shadow-xl">
+        <div className="modal-overlay">
+          <div className="modal-card w-full max-w-md rounded-lg p-6">
             <h2 className="mb-4 text-lg font-semibold text-silver-100">
               Create Device Group
             </h2>
@@ -324,8 +324,8 @@ export function DeviceGroupsPage() {
 
       {/* Edit Group Modal */}
       {isEditModalOpen && selectedGroup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-lg border border-dark-700 bg-dark-800 p-6 shadow-xl">
+        <div className="modal-overlay">
+          <div className="modal-card w-full max-w-md rounded-lg p-6">
             <h2 className="mb-4 text-lg font-semibold text-silver-100">
               Edit Device Group
             </h2>
