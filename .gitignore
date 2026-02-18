@@ -25,6 +25,11 @@ vault-keys.json
 # Dependencies
 # ===========================================
 node_modules/
+**/node_modules/
+# Explicit symlink exclusions (WSL/Windows interop creates these as tracked symlinks)
+packages/shared-auth/node_modules
+packages/shared-types/node_modules
+packages/shared-ui/node_modules
 .pnp/
 .pnp.js
 
