@@ -3184,7 +3184,7 @@ async function proxyToSTIGService(
   };
 
   if (body && method !== "GET") {
-    options.body = JSON.stringify(body);
+    options.body = JSON.stringify({ data: body });
   }
 
   const response = await fetch(url, options);

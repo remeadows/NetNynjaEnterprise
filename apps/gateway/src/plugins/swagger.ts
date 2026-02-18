@@ -70,7 +70,7 @@ Common error codes:
 
 API version is included in the URL path: \`/api/v1/...\`
         `.trim(),
-        version: "0.1.0",
+        version: "0.2.15",
         contact: {
           name: "NetNynja Team",
           email: "support@netnynja.local",

@@ -1,6 +1,6 @@
 {
   "name": "@netnynja/shared-ui",
-  "version": "0.1.0",
+  "version": "0.2.15",
   "description": "NetNynja Enterprise - Shared UI Component Library",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
