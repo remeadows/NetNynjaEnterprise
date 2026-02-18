@@ -1,6 +1,6 @@
 {
   "name": "@gridwatch/gateway",
-  "version": "0.2.15",
+  "version": "0.3.0",
   "private": true,
   "description": "GridWatch NetEnterprise API Gateway",
   "main": "./dist/index.js",

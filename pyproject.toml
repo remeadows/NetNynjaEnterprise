@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "gridwatch-net-enterprise"
-version = "0.2.15"
+version = "0.3.0"
 description = "GridWatch NetEnterprise - Python Services"
 authors = ["WarSignalLabs"]
 readme = "README.md"
