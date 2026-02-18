@@ -377,8 +377,8 @@ services:
 
   ipam-service:
     build:
-      context: ./apps/ipam
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/ipam/Dockerfile
       target: development
     profiles: ["ipam"]
     container_name: gridwatch-ipam-service
@@ -399,6 +399,7 @@ services:
       LOG_LEVEL: DEBUG
     volumes:
       - ./apps/ipam/src:/app/src:ro
+      - ./services/shared-python/src:/app/shared-python/src:ro
     ports:
       - "3003:3003"
     depends_on:
@@ -423,8 +424,8 @@ services:
 
   ipam-scanner:
     build:
-      context: ./apps/ipam
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/ipam/Dockerfile
       target: scanner
     profiles: ["ipam"]
     container_name: gridwatch-ipam-scanner

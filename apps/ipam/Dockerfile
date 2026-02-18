@@ -1,5 +1,6 @@
 # GridWatch IPAM Service - Multi-stage Dockerfile
-# Build: docker build --target production -t gridwatch-ipam .
+# Build context: repo root (for access to services/shared-python)
+# Build: docker build -f apps/ipam/Dockerfile --target production -t gridwatch-ipam .
 
 # ==================================================
 # Base image with Python 3.13 (Alpine - CDN accessible)
@@ -33,18 +34,23 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
+# Install shared-python library (used by IPAM for DB pool, logging, health checks)
+COPY services/shared-python/pyproject.toml /app/shared-python/pyproject.toml
+COPY services/shared-python/src/ /app/shared-python/src/
+RUN pip install --upgrade pip && \
+    pip install /app/shared-python
+
 # ==================================================
 # Development stage
 # ==================================================
 FROM base AS development
 
 # Install development dependencies
-RUN pip install --upgrade pip && \
-    pip install hatch
+RUN pip install hatch
 
 # Copy project files
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
+COPY apps/ipam/pyproject.toml apps/ipam/README.md ./
+COPY apps/ipam/src/ ./src/
 RUN pip install -e ".[dev]"
 
 # Default command for development
@@ -58,10 +64,8 @@ FROM base AS scanner
 # Scanner needs elevated privileges for raw sockets
 # Note: Container should be run with --cap-add=NET_RAW
 
-RUN pip install --upgrade pip
-
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
+COPY apps/ipam/pyproject.toml apps/ipam/README.md ./
+COPY apps/ipam/src/ ./src/
 RUN pip install .
 
 # Scanner worker command
@@ -72,10 +76,10 @@ CMD ["python", "-m", "ipam.collectors.nats_handler"]
 # ==================================================
 FROM base AS builder
 
-RUN pip install --upgrade pip build
+RUN pip install build
 
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
+COPY apps/ipam/pyproject.toml apps/ipam/README.md ./
+COPY apps/ipam/src/ ./src/
 
 RUN pip wheel --no-deps --wheel-dir /app/wheels .
 
@@ -100,12 +104,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Install shared-python (needed at runtime)
+COPY --from=base /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+
 # Copy wheels and install
 COPY --from=builder /app/wheels /app/wheels
 RUN pip install --no-cache-dir /app/wheels/*.whl && rm -rf /app/wheels
 
 # Copy source for reference (optional, can be removed for smaller image)
-COPY --chown=ipam:ipam src/ ./src/
+COPY --chown=ipam:ipam apps/ipam/src/ ./src/
 
 USER ipam
 
