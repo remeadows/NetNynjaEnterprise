@@ -74,20 +74,23 @@ Write-Host "[4/7] Stopping stack..." -ForegroundColor Yellow
 docker compose down | Out-Null
 Write-Host "  Stack stopped." -ForegroundColor Green
 
-# Step 5: Remove old postgres volume
-Write-Host "[5/7] Removing old postgres data volume..." -ForegroundColor Yellow
-$volume = docker volume ls --format "{{.Name}}" 2>&1 | Where-Object { $_ -match "postgres" } | Select-Object -First 1
-if ($volume) {
-    Write-Host "  Found volume: $volume" -ForegroundColor Yellow
-    $confirm = Read-Host "  Remove volume '$volume'? Data will be restored from backup. (yes/no)"
-    if ($confirm -eq "yes") {
-        docker volume rm $volume | Out-Null
-        Write-Host "  Volume removed." -ForegroundColor Green
+# Step 5: Migrate critical netnynja-* volumes to gridwatch-* (safe copy, no data loss)
+Write-Host "[5/7] Migrating Docker volumes (netnynja-* to gridwatch-*)..." -ForegroundColor Yellow
+$volumeMappings = @(
+    @{ From = "netnynja-postgres-data"; To = "gridwatch-postgres-data" },
+    @{ From = "netnynja-redis-data";    To = "gridwatch-redis-data" },
+    @{ From = "netnynja-nats-data";     To = "gridwatch-nats-data" }
+)
+$existingVolumes = docker volume ls --format "{{.Name}}" 2>&1
+foreach ($mapping in $volumeMappings) {
+    if ($existingVolumes -contains $mapping.From) {
+        Write-Host "  Copying $($mapping.From) -> $($mapping.To)..." -ForegroundColor Yellow
+        docker volume create $mapping.To | Out-Null
+        docker run --rm -v "$($mapping.From):/from" -v "$($mapping.To):/to" alpine sh -c "cp -av /from/. /to/" | Out-Null
+        Write-Host "  Done. (old volume kept as backup)" -ForegroundColor Green
     } else {
-        Write-Host "  Skipped volume removal." -ForegroundColor Yellow
+        Write-Host "  $($mapping.From) not found - skipping (will init fresh)" -ForegroundColor Yellow
     }
-} else {
-    Write-Host "  No named postgres volume found." -ForegroundColor Yellow
 }
 
 # Step 6: Rebuild images

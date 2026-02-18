@@ -42,9 +42,9 @@ COPY --from=deps /app/node_modules ./node_modules
 
 # Ensure workspace package symlinks are correct in node_modules
 RUN mkdir -p node_modules/@GridWatch && \
-    rm -rf node_modules/@GridWatch/shared-types node_modules/@GridWatch/shared-ui && \
-    ln -s ../../packages/shared-types node_modules/@GridWatch/shared-types && \
-    ln -s ../../packages/shared-ui node_modules/@GridWatch/shared-ui
+    rm -rf node_modules/@gridwatch/shared-types node_modules/@gridwatch/shared-ui && \
+    ln -s ../../packages/shared-types node_modules/@gridwatch/shared-types && \
+    ln -s ../../packages/shared-ui node_modules/@gridwatch/shared-ui
 
 # Build shared packages first, then web-ui (with increased memory for CI)
 ARG VITE_API_URL=/api
