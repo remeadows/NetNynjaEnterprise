@@ -50,7 +50,7 @@ const authPlugin: FastifyPluginAsync<AuthPluginOptions> = async (
   });
 
   // Decorate request with user
-  fastify.decorateRequest("user", null);
+  fastify.decorateRequest("user", undefined);
 
   // Decorate fastify with auth helpers
   fastify.decorate(
