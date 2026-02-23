@@ -155,10 +155,12 @@ write_secret "GridWatch/services/ipam" '{
 }'
 
 # NPM service secrets
-write_secret "GridWatch/services/npm" '{
-  "snmp_community": "public",
-  "poll_interval": 60
-}'
+# REQUIRED FOR PRODUCTION: set SNMP_COMMUNITY to your actual community string before running.
+SNMP_COMMUNITY="${SNMP_COMMUNITY:-CHANGE-ME-IN-PRODUCTION}"
+write_secret "GridWatch/services/npm" "{
+  \"snmp_community\": \"$SNMP_COMMUNITY\",
+  \"poll_interval\": 60
+}"
 
 # STIG service secrets
 write_secret "GridWatch/services/stig" '{

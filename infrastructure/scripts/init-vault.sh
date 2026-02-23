@@ -57,8 +57,9 @@ vault kv put secret/ipam \
     nmap_path="/usr/bin/nmap"
 
 # NPM module secrets
+# REQUIRED FOR PRODUCTION: set SNMP_COMMUNITY to your actual community string before running.
 vault kv put secret/npm \
-    snmp_community="public" \
+    snmp_community="${SNMP_COMMUNITY:-CHANGE-ME-IN-PRODUCTION}" \
     poll_interval="60"
 
 # STIG module secrets  
