@@ -17,10 +17,13 @@ WORKDIR /app
 # Copy root package files
 COPY package.json package-lock.json turbo.json ./
 
-# Copy workspace package.json files
+# Copy ALL workspace package.json files for complete npm ci resolution
 COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/shared-auth/package.json ./packages/shared-auth/
 COPY packages/shared-ui/package.json ./packages/shared-ui/
+COPY apps/gateway/package.json ./apps/gateway/
 COPY apps/web-ui/package.json ./apps/web-ui/
+COPY services/auth-service/package.json ./services/auth-service/
 
 # Install dependencies with optimizations for CI
 RUN npm ci --legacy-peer-deps && npm cache clean --force

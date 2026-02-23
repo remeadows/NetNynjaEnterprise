@@ -28,6 +28,11 @@ on:
         default: "false"
         type: boolean
 
+permissions:
+  contents: read
+  packages: write
+  actions: write
+
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/gridwatch
@@ -259,7 +264,7 @@ jobs:
       - name: Build and push IPAM
         uses: docker/build-push-action@v5
         with:
-          context: ./apps/ipam
+          context: .
           file: ./apps/ipam/Dockerfile
           target: production
           platforms: linux/amd64,linux/arm64
@@ -305,7 +310,7 @@ jobs:
       - name: Build and push NPM
         uses: docker/build-push-action@v5
         with:
-          context: ./apps/npm
+          context: .
           file: ./apps/npm/Dockerfile
           target: production
           platforms: linux/amd64,linux/arm64
@@ -445,7 +450,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: "trivy-gateway.sarif"
         continue-on-error: true

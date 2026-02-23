@@ -1,5 +1,6 @@
 # GridWatch NPM Service - Multi-stage Dockerfile
-# Build: docker build --target production -t gridwatch-npm .
+# Build context: repo root (for consistency with IPAM and future shared_python access)
+# Build: docker build -f apps/npm/Dockerfile --target production -t gridwatch-npm .
 
 # ==================================================
 # Base image with Python 3.13 (Alpine - CDN accessible)
@@ -43,8 +44,8 @@ RUN pip install --upgrade pip && \
     pip install hatch
 
 # Copy project files
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
+COPY apps/npm/pyproject.toml apps/npm/README.md ./
+COPY apps/npm/src/ ./src/
 RUN pip install -e ".[dev]"
 
 # Default command for development
@@ -57,8 +58,8 @@ FROM base AS collector
 
 RUN pip install --upgrade pip
 
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
+COPY apps/npm/pyproject.toml apps/npm/README.md ./
+COPY apps/npm/src/ ./src/
 RUN pip install .
 
 # Collector worker command (SNMPv3)
@@ -71,8 +72,8 @@ FROM base AS alerts
 
 RUN pip install --upgrade pip
 
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
+COPY apps/npm/pyproject.toml apps/npm/README.md ./
+COPY apps/npm/src/ ./src/
 RUN pip install .
 
 # Alert service command
@@ -85,8 +86,8 @@ FROM base AS builder
 
 RUN pip install --upgrade pip build
 
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
+COPY apps/npm/pyproject.toml apps/npm/README.md ./
+COPY apps/npm/src/ ./src/
 
 RUN pip wheel --no-deps --wheel-dir /app/wheels .
 
@@ -116,7 +117,7 @@ COPY --from=builder /app/wheels /app/wheels
 RUN pip install --no-cache-dir /app/wheels/*.whl && rm -rf /app/wheels
 
 # Copy source for reference
-COPY --chown=npm:npm src/ ./src/
+COPY --chown=npm:npm apps/npm/src/ ./src/
 
 USER npm
 

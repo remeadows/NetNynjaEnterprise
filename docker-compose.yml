@@ -490,8 +490,8 @@ services:
 
   npm-service:
     build:
-      context: ./apps/npm
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/npm/Dockerfile
       target: development
     profiles: ["npm"]
     container_name: gridwatch-npm-service
@@ -537,8 +537,8 @@ services:
 
   npm-collector:
     build:
-      context: ./apps/npm
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/npm/Dockerfile
       target: collector
     profiles: ["npm"]
     container_name: gridwatch-npm-collector
@@ -567,8 +567,8 @@ services:
 
   npm-alerts:
     build:
-      context: ./apps/npm
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/npm/Dockerfile
       target: alerts
     profiles: ["npm"]
     container_name: gridwatch-npm-alerts
