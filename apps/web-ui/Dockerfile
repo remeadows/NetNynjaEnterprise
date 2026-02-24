@@ -4,7 +4,7 @@
 # ============================================
 # Base stage
 # ============================================
-FROM node:20-alpine AS base
+FROM node:20.11-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
@@ -82,7 +82,7 @@ CMD ["sh", "-c", "ln -sf /app/node_modules /packages/shared-ui/node_modules 2>/d
 # ============================================
 # Production stage (nginx)
 # ============================================
-FROM nginx:1.25-alpine AS production
+FROM nginx:1.25.4-alpine AS production
 
 # Copy built assets from builder
 COPY --from=builder /app/apps/web-ui/dist/ /usr/share/nginx/html/

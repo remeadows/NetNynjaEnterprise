@@ -163,10 +163,10 @@ jobs:
             context: .
             dockerfile: ./services/auth-service/Dockerfile
           - name: ipam
-            context: ./apps/ipam
+            context: .
             dockerfile: ./apps/ipam/Dockerfile
           - name: npm
-            context: ./apps/npm
+            context: .
             dockerfile: ./apps/npm/Dockerfile
           - name: stig
             context: ./apps/stig

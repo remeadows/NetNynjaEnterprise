@@ -1,10 +1,11 @@
 # GridWatch Syslog Service Dockerfile
-# Multi-stage build for development and production
+# Build context: ./apps/syslog (self-contained, no shared deps)
+# Build: docker build -f apps/syslog/Dockerfile --target production -t gridwatch-syslog ./apps/syslog
 
 # ============================================
 # Base stage with Python 3.13 (Alpine - CDN accessible)
 # ============================================
-FROM python:3.13-alpine AS base
+FROM python:3.13.1-alpine AS base
 
 # Security: Update system packages and install build deps
 RUN apk upgrade --no-cache && \
@@ -65,7 +66,7 @@ CMD ["python", "-m", "syslog.forwarder"]
 # ============================================
 # Production stage
 # ============================================
-FROM python:3.13-alpine AS production
+FROM python:3.13.1-alpine AS production
 
 WORKDIR /app
 
@@ -86,6 +87,8 @@ USER syslog
 ENV PYTHONUNBUFFERED=1
 ENV LOG_LEVEL=INFO
 ENV PYTHONPATH=/app/src
+
+EXPOSE 3007
 
 CMD ["uvicorn", "syslog.main:app", "--host", "0.0.0.0", "--port", "3007"]
 

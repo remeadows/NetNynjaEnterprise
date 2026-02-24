@@ -1,10 +1,11 @@
 # GridWatch STIG Service - Multi-stage Dockerfile
-# Build: docker build --target production -t gridwatch-stig .
+# Build context: ./apps/stig (self-contained, no shared deps)
+# Build: docker build -f apps/stig/Dockerfile --target production -t gridwatch-stig ./apps/stig
 
 # ==================================================
 # Base image with Python 3.13 (Alpine - CDN accessible)
 # ==================================================
-FROM python:3.13-alpine AS base
+FROM python:3.13.1-alpine AS base
 
 # Security: Update system packages
 RUN apk upgrade --no-cache
@@ -95,7 +96,7 @@ RUN pip wheel --no-deps --wheel-dir /app/wheels .
 # ==================================================
 # Production stage
 # ==================================================
-FROM python:3.13-alpine AS production
+FROM python:3.13.1-alpine AS production
 
 # Non-root user for security
 RUN addgroup -g 1000 stig && \

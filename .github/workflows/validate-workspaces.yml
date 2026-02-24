@@ -29,6 +29,9 @@ on:
       - "turbo.json"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   validate-workspaces:
     strategy:

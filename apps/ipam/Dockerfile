@@ -5,7 +5,7 @@
 # ==================================================
 # Base image with Python 3.13 (Alpine - CDN accessible)
 # ==================================================
-FROM python:3.13-alpine AS base
+FROM python:3.13.1-alpine AS base
 
 # Security: Update system packages
 RUN apk upgrade --no-cache
@@ -86,7 +86,7 @@ RUN pip wheel --no-deps --wheel-dir /app/wheels .
 # ==================================================
 # Production stage
 # ==================================================
-FROM python:3.13-alpine AS production
+FROM python:3.13.1-alpine AS production
 
 # Non-root user for security
 RUN addgroup -g 1000 ipam && \

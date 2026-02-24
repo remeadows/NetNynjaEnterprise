@@ -390,6 +390,9 @@ services:
       - "3000:3000"
     depends_on:
       - gateway
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/"]
     logging: *default-logging
     networks:
       - gridwatch-network

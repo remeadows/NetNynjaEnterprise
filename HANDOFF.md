@@ -2,10 +2,10 @@
 
 > Session state for cross-agent and cross-session continuity
 
-**Last Updated**: 2026-02-18 UTC
-**Last Agent**: Claude Opus 4.6 (UI overhaul + infrastructure session)
+**Last Updated**: 2026-02-24 UTC
+**Last Agent**: Claude Opus 4.6 (CI/CD hardening session)
 **Version**: 0.3.0
-**Branch**: main
+**Branch**: claude/debug-cicd-failures-xBMgR
 **Working Tree**: Clean ✅
 
 ---
@@ -19,10 +19,50 @@
 | Post-rebrand    | Version 0.3.0, JWT rotation, IPAM fixed, logo created | 4949eb4, 29d33b5, 26d01c9          | ✅     |
 | Security sprint | SEC-HARDENING-01, CVE-2025-15467 Alpine patches       | multiple                           | ✅     |
 | **UI overhaul** | Tasks 1-7, CoreDNS, DensityToggle cleanup, fixes      | 415e331, d17a768, 4e7992f, 4ede803 | ✅     |
+| **CI/CD hardening** | Workflow + Dockerfile audit and fixes               | (this branch)                      | ✅     |
 
 ---
 
-## Current Session — UI Overhaul + Infrastructure (2026-02-18)
+## Current Session — CI/CD Hardening (2026-02-24)
+
+### Summary
+
+Full audit and fix of all GitHub Actions workflows and Dockerfiles. Addressed supply-chain risk (unpinned actions), missing permissions, broken build contexts, missing EXPOSE directives, and unpinned base images.
+
+### Changes
+
+| Category | Files | What changed |
+|----------|-------|-------------|
+| **Pin trivy-action** | `security-scan.yml` (6), `build-images.yml` (1) | `@master` → `@v0.28.0` |
+| **Add permissions** | `test.yml`, `validate-poetry.yml`, `validate-workspaces.yml` | Added `permissions: contents: read` |
+| **Fix build contexts** | `release.yml` | IPAM/NPM context `./apps/{svc}` → `.` (match Dockerfile expectations) |
+| **Fix Dockerfile comments** | `apps/stig/Dockerfile`, `apps/syslog/Dockerfile` | Corrected build context comments to match `./apps/{svc}` usage |
+| **Add EXPOSE** | `apps/syslog/Dockerfile` | Added `EXPOSE 3007` to production stage |
+| **Add healthcheck** | `docker-compose.yml` | Added healthcheck to `web-ui` service |
+| **Pin base images** | All 7 Dockerfiles | `node:20-alpine` → `20.11-alpine`, `python:3.13-alpine` → `3.13.1-alpine`, `nginx:1.25-alpine` → `1.25.4-alpine` |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `.github/workflows/security-scan.yml` | Pin trivy-action@v0.28.0 (6 instances) |
+| `.github/workflows/build-images.yml` | Pin trivy-action@v0.28.0 (1 instance) |
+| `.github/workflows/test.yml` | Add `permissions: contents: read` |
+| `.github/workflows/validate-poetry.yml` | Add `permissions: contents: read` |
+| `.github/workflows/validate-workspaces.yml` | Add `permissions: contents: read` |
+| `.github/workflows/release.yml` | Fix IPAM/NPM build contexts from `./apps/{svc}` to `.` |
+| `apps/gateway/Dockerfile` | Pin `node:20.11-alpine` |
+| `apps/web-ui/Dockerfile` | Pin `node:20.11-alpine`, `nginx:1.25.4-alpine` |
+| `services/auth-service/Dockerfile` | Pin `node:20.11-alpine` |
+| `apps/ipam/Dockerfile` | Pin `python:3.13.1-alpine` |
+| `apps/npm/Dockerfile` | Pin `python:3.13.1-alpine` |
+| `apps/stig/Dockerfile` | Pin `python:3.13.1-alpine`, fix build context comment |
+| `apps/syslog/Dockerfile` | Pin `python:3.13.1-alpine`, add `EXPOSE 3007`, fix build context comment |
+| `docker-compose.yml` | Add web-ui healthcheck |
+
+---
+
+## Previous Session — UI Overhaul + Infrastructure (2026-02-18)
 
 ### Commits
 

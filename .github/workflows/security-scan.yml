@@ -70,7 +70,7 @@ jobs:
           target: production
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: gridwatch/${{ matrix.image.name }}:${{ github.sha }}
           format: "sarif"
@@ -88,7 +88,7 @@ jobs:
         continue-on-error: true
 
       - name: Run Trivy (table output for PR comments)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: gridwatch/${{ matrix.image.name }}:${{ github.sha }}
           format: "table"
@@ -168,7 +168,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Trivy IaC scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: "config"
           scan-ref: "."
@@ -186,7 +186,7 @@ jobs:
         continue-on-error: true
 
       - name: Run Trivy IaC (table output)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: "config"
           scan-ref: "."
@@ -212,7 +212,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run Trivy secret scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: "fs"
           scan-ref: "."
@@ -282,7 +282,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate SBOM with Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: "fs"
           scan-ref: "."

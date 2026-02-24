@@ -25,6 +25,9 @@ on:
       - "services/**/*.py"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   validate-poetry:
     strategy:
